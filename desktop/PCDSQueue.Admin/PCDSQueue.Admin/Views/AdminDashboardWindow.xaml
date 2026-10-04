@@ -1,0 +1,193 @@
+<Window x:Class="PCDSQueue.Admin.Views.AdminDashboardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="clr-namespace:PCDSQueue.Admin.Views"
+        Title="PCDS Queue Admin"
+        Width="1280" Height="800" MinWidth="1100" MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="245" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Background="{StaticResource PrimaryDarkBrush}">
+            <Grid Margin="26">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <Border Width="48" Height="48" HorizontalAlignment="Left"
+                            CornerRadius="10" Background="White">
+                        <TextBlock Text="P" Foreground="{StaticResource PrimaryBrush}"
+                                   FontSize="23" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="PCDS QUEUE ADMIN" Foreground="White"
+                               FontWeight="Bold" FontSize="15" Margin="0,15,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Margin="0,42,0,0">
+                        <Button x:Name="DashboardNavigationButton" Content="Dashboard"
+                            Style="{StaticResource AdminNavigationButton}"
+                            Foreground="White" Background="#1D478B"
+                            Click="DashboardNavigationButton_Click" />
+                        <Button x:Name="DepartmentsNavigationButton" Content="Departments"
+                            Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,8,0,0" Click="DepartmentsButton_Click" />
+                        <Button x:Name="ServiceWindowsNavigationButton" Content="Service Windows"
+                                Style="{StaticResource AdminNavigationButton}"
+                                Margin="0,4,0,0" Click="ServiceWindowsButton_Click" />
+                        <Button x:Name="StaffAccountsNavigationButton" Content="Staff Accounts"
+                            Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="StaffAccountsButton_Click" />
+                        <Button x:Name="LiveQueueNavigationButton" Content="Live Queue"
+                            Style="{StaticResource AdminNavigationButton}"
+                                Margin="0,4,0,0" Click="LiveQueueButton_Click" />
+                        <Button x:Name="QueueHistoryNavigationButton" Content="Queue History"
+                            Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="QueueHistoryButton_Click" />
+                        <Button x:Name="ReportsNavigationButton" Content="Reports"
+                            Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="ReportsButton_Click" />
+                        <Button x:Name="QrManagementNavigationButton" Content="QR Management"
+                            Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="QrManagementButton_Click" />
+                        <Button x:Name="SettingsNavigationButton" Content="Settings"
+                            Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="SettingsButton_Click" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="2">
+                    <Border Height="1" Background="#31518A" Margin="0,0,0,18" />
+                    <TextBlock x:Name="AdminNameText" Text="Administrator" Foreground="White"
+                               FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock x:Name="AdminUsernameText" Text="@admin" Foreground="#9FB5DA"
+                               FontSize="11" Margin="0,4,0,14" />
+                    <Button Content="LOG OUT" Height="40" Foreground="White"
+                            Background="#1A427E" BorderThickness="0" Cursor="Hand"
+                            Click="LogoutButton_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="34,28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="22" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <StackPanel>
+                    <TextBlock x:Name="PageTitleText" Text="ADMIN DASHBOARD"
+                               Foreground="{StaticResource TextBrush}"
+                               FontSize="26" FontWeight="Bold" />
+                    <TextBlock x:Name="PageSubtitleText" Text="Campus queue overview for today"
+                               Foreground="{StaticResource MutedTextBrush}"
+                               FontSize="13" Margin="0,5,0,0" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            VerticalAlignment="Top" Margin="0,8,0,0">
+                    <Ellipse x:Name="ServerStatusDot" Width="8" Height="8"
+                             Fill="#9CA3AF" Margin="0,0,8,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ServerStatusText" Text="Checking server..."
+                               Foreground="{StaticResource MutedTextBrush}"
+                               FontSize="12" VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+
+            <Grid x:Name="DashboardPage" Grid.Row="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="24" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource DashboardCard}">
+                    <StackPanel>
+                        <TextBlock Text="WAITING TODAY" Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11" FontWeight="SemiBold" />
+                        <TextBlock x:Name="WaitingTodayText" Text="--" Foreground="{StaticResource TextBrush}"
+                                   FontSize="34" FontWeight="Bold" Margin="0,9,0,0" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource DashboardCard}">
+                    <StackPanel>
+                        <TextBlock Text="CURRENTLY SERVING" Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11" FontWeight="SemiBold" />
+                        <TextBlock x:Name="CurrentlyServingText" Text="--" Foreground="{StaticResource TextBrush}"
+                                   FontSize="34" FontWeight="Bold" Margin="0,9,0,0" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="4" Style="{StaticResource DashboardCard}">
+                    <StackPanel>
+                        <TextBlock Text="ACTIVE WINDOWS" Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11" FontWeight="SemiBold" />
+                        <TextBlock x:Name="ActiveWindowsText" Text="--" Foreground="{StaticResource TextBrush}"
+                                   FontSize="34" FontWeight="Bold" Margin="0,9,0,0" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="6" Style="{StaticResource DashboardCard}">
+                    <StackPanel>
+                        <TextBlock Text="DEPARTMENTS" Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11" FontWeight="SemiBold" />
+                        <TextBlock x:Name="DepartmentsText" Text="--" Foreground="{StaticResource TextBrush}"
+                                   FontSize="34" FontWeight="Bold" Margin="0,9,0,0" />
+                    </StackPanel>
+                </Border>
+                </Grid>
+
+                <Border Grid.Row="2" Style="{StaticResource DashboardCard}" Padding="22">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="DEPARTMENT STATUS" Foreground="{StaticResource TextBrush}"
+                               FontSize="14" FontWeight="Bold" />
+                    <TextBlock x:Name="DashboardErrorText" Grid.Row="1" Foreground="#DC3545"
+                               FontSize="12" TextWrapping="Wrap" Visibility="Collapsed"
+                               Margin="0,10,0,0" />
+                    <DataGrid x:Name="DepartmentStatusGrid" Grid.Row="2"
+                              AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              SelectionMode="Single" HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal" BorderThickness="0"
+                              RowHeight="48" ColumnHeaderHeight="42"
+                              AlternatingRowBackground="#F8FAFC"
+                              Background="White" Margin="0,14,0,0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="DEPARTMENT" Binding="{Binding DepartmentName}" Width="*" />
+                            <DataGridTextColumn Header="ACTIVE WINDOWS" Binding="{Binding ActiveWindows}" Width="170" />
+                            <DataGridTextColumn Header="WAITING" Binding="{Binding WaitingCount}" Width="130" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+                </Border>
+            </Grid>
+
+            <views:DepartmentsWindow x:Name="DepartmentsPage" Grid.Row="2" Visibility="Collapsed" />
+                <views:ServiceWindowsWindow x:Name="ServiceWindowsPage" Grid.Row="2" Visibility="Collapsed" />
+                <views:StaffAccountsWindow x:Name="StaffAccountsPage" Grid.Row="2" Visibility="Collapsed" />
+                <views:LiveQueueWindow x:Name="LiveQueuePage" Grid.Row="2" Visibility="Collapsed" />
+                <views:QueueHistoryWindow x:Name="QueueHistoryPage" Grid.Row="2" Visibility="Collapsed" />
+                <views:ReportsWindow x:Name="ReportsPage" Grid.Row="2" Visibility="Collapsed" />
+                <views:QrManagementWindow x:Name="QrManagementPage" Grid.Row="2" Visibility="Collapsed" />
+                <views:SettingsWindow x:Name="SettingsPage" Grid.Row="2" Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</Window>

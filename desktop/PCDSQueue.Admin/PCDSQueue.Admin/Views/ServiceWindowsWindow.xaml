@@ -1,0 +1,58 @@
+<UserControl x:Class="PCDSQueue.Admin.Views.ServiceWindowsWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BackgroundBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="14" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Button x:Name="AddWindowButton" Grid.Row="0" Content="+  ADD WINDOW"
+                Style="{StaticResource PrimaryButton}" Width="150" Height="42"
+                HorizontalAlignment="Right" Click="AddWindowButton_Click" />
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="DEPARTMENT" Foreground="{StaticResource MutedTextBrush}"
+                       FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"
+                       Margin="0,0,12,0" />
+            <ComboBox x:Name="DepartmentComboBox" Grid.Column="1" Height="42"
+                      DisplayMemberPath="DepartmentName" VerticalContentAlignment="Center"
+                      SelectionChanged="DepartmentComboBox_SelectionChanged" />
+            <Button Grid.Column="3" Content="REFRESH" Width="90" Height="36"
+                    Click="RefreshButton_Click" />
+        </Grid>
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="EditWindowButton" Content="EDIT" Width="90" Height="36"
+                    IsEnabled="False" Click="EditWindowButton_Click" />
+            <Button x:Name="ToggleWindowStatusButton" Content="DEACTIVATE" Width="120" Height="36"
+                    Margin="8,0,0,0" IsEnabled="False" Click="ToggleWindowStatusButton_Click" />
+        </StackPanel>
+        <TextBlock x:Name="WindowsErrorText" Grid.Row="5" Foreground="#DC3545"
+                   TextWrapping="Wrap" Visibility="Collapsed" />
+        <Border Grid.Row="6" Style="{StaticResource DashboardCard}" Padding="18">
+            <DataGrid x:Name="WindowsGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                      CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      BorderThickness="0" RowHeight="50" ColumnHeaderHeight="44"
+                      AlternatingRowBackground="#F8FAFC" Background="White"
+                      SelectionChanged="WindowsGrid_SelectionChanged">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="WINDOW" Binding="{Binding WindowName}" Width="*" />
+                    <DataGridTextColumn Header="CONFIGURATION" Binding="{Binding ConfiguredStatus}" Width="150" />
+                    <DataGridTextColumn Header="AVAILABILITY" Binding="{Binding AvailabilityStatus}" Width="150" />
+                    <DataGridTextColumn Header="CURRENT STAFF" Binding="{Binding StaffDisplay}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+    </Grid>
+</UserControl>

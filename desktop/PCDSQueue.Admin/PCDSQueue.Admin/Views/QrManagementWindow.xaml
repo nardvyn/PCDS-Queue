@@ -1,0 +1,115 @@
+<UserControl x:Class="PCDSQueue.Admin.Views.QrManagementWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BackgroundBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="90" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="DEPARTMENT" Foreground="{StaticResource MutedTextBrush}"
+                       FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"
+                       Margin="0,0,10,0" />
+            <ComboBox x:Name="DepartmentComboBox" Grid.Column="1" Height="40"
+                      DisplayMemberPath="DepartmentName" VerticalContentAlignment="Center"
+                      SelectionChanged="DepartmentComboBox_SelectionChanged" />
+            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center"
+                        Margin="0,0,18,0">
+                <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="#9CA3AF"
+                         Margin="0,0,8,0" VerticalAlignment="Center" />
+                <TextBlock x:Name="StatusText" Text="NO QR SESSION"
+                           Foreground="{StaticResource MutedTextBrush}"
+                           FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button Grid.Column="4" Content="REFRESH" Height="36"
+                    Click="RefreshButton_Click" />
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="28" />
+                <ColumnDefinition Width="300" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="DEPARTMENT QUEUE QR" Foreground="{StaticResource TextBrush}"
+                           FontSize="19" FontWeight="Bold" />
+                <TextBlock Text="A secure, expiring token for the mobile queue flow"
+                           Foreground="{StaticResource MutedTextBrush}" FontSize="12"
+                           Margin="0,6,0,22" />
+
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="115" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="CREATED" Foreground="{StaticResource MutedTextBrush}"
+                               FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock x:Name="CreatedText" Grid.Column="1" Text="---"
+                               Foreground="{StaticResource TextBrush}" FontSize="12"
+                               VerticalAlignment="Center" />
+                </Grid>
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="115" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="EXPIRES" Foreground="{StaticResource MutedTextBrush}"
+                               FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ExpiresText" Grid.Column="1" Text="---"
+                               Foreground="{StaticResource TextBrush}" FontSize="12"
+                               VerticalAlignment="Center" />
+                </Grid>
+
+                <TextBlock x:Name="QrMessageText" Text="Generate a QR to create a new mobile access token."
+                           Foreground="{StaticResource MutedTextBrush}" FontSize="12"
+                           TextWrapping="Wrap" MaxWidth="440" Margin="0,0,0,20" />
+
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="GenerateButton" Content="GENERATE QR"
+                            Style="{StaticResource PrimaryButton}" Width="170" Height="44"
+                            Click="GenerateButton_Click" />
+                    <Button x:Name="DeactivateButton" Content="DEACTIVATE" Width="125" Height="44"
+                            Margin="10,0,0,0" IsEnabled="False" Click="DeactivateButton_Click" />
+                </StackPanel>
+            </StackPanel>
+
+            <Border Grid.Column="2" Style="{StaticResource DashboardCard}" Padding="18"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel Width="250">
+                    <Border Width="250" Height="250" Background="White"
+                            BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="4">
+                        <Grid>
+                            <Image x:Name="QrImage" Stretch="Uniform" Margin="12" />
+                            <TextBlock x:Name="QrPlaceholderText" Text="QR preview appears after generation"
+                                       Foreground="{StaticResource MutedTextBrush}" FontSize="11"
+                                       TextWrapping="Wrap" TextAlignment="Center"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Margin="24" />
+                        </Grid>
+                    </Border>
+                    <TextBlock x:Name="QrDepartmentText" Text="Select a department"
+                               Foreground="{StaticResource TextBrush}" FontSize="13"
+                               FontWeight="Bold" HorizontalAlignment="Center" Margin="0,12,0,0" />
+                    <TextBlock Text="Mobile queue access" Foreground="{StaticResource MutedTextBrush}"
+                               FontSize="11" HorizontalAlignment="Center" Margin="0,3,0,12" />
+                    <Button x:Name="SaveQrButton" Content="SAVE QR PNG" Height="40"
+                            IsEnabled="False" Click="SaveQrButton_Click" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <TextBlock x:Name="QrErrorText" Grid.Row="2" Foreground="#DC3545"
+                   FontSize="12" TextWrapping="Wrap" Visibility="Collapsed"
+                   VerticalAlignment="Bottom" Margin="0,0,330,0" />
+    </Grid>
+</UserControl>

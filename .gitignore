@@ -1,0 +1,29 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+instance/
+
+# Node
+node_modules/
+.expo/
+dist/
+build/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local captures and generated release packages
+*.pkt
+/release/

@@ -1,0 +1,52 @@
+<Window x:Class="PCDSQueue.Admin.Views.DepartmentFormWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Department"
+        Width="500" Height="570" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock x:Name="TitleText" Text="ADD DEPARTMENT" Foreground="{StaticResource TextBrush}"
+                       FontSize="22" FontWeight="Bold" />
+            <TextBlock Text="Department identity, availability, and active service windows"
+                       Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="0,6,0,0" />
+        </StackPanel>
+        <StackPanel Grid.Row="2">
+            <TextBlock Text="DEPARTMENT NAME" FontSize="11" FontWeight="SemiBold"
+                       Foreground="#4A5568" Margin="0,0,0,7" />
+            <TextBox x:Name="DepartmentNameTextBox" Style="{StaticResource ModernTextBox}" />
+
+            <TextBlock Text="QUEUE PREFIX" FontSize="11" FontWeight="SemiBold"
+                       Foreground="#4A5568" Margin="0,18,0,7" />
+            <TextBox x:Name="QueuePrefixTextBox" Style="{StaticResource ModernTextBox}" MaxLength="10" />
+
+            <TextBlock Text="NUMBER OF ACTIVE WINDOWS (1-50)" FontSize="11" FontWeight="SemiBold"
+                       Foreground="#4A5568" Margin="0,18,0,7" />
+            <TextBox x:Name="WindowCountTextBox" Style="{StaticResource ModernTextBox}" Text="1" />
+
+            <TextBlock Text="STATUS" FontSize="11" FontWeight="SemiBold"
+                       Foreground="#4A5568" Margin="0,18,0,7" />
+            <ComboBox x:Name="StatusComboBox" Height="42" SelectedIndex="0"
+                      VerticalContentAlignment="Center" Padding="10,0">
+                <ComboBoxItem Content="Active" />
+                <ComboBoxItem Content="Inactive" />
+            </ComboBox>
+
+            <TextBlock x:Name="ErrorText" Foreground="#DC3545" FontSize="12"
+                       TextWrapping="Wrap" Visibility="Collapsed" Margin="0,12,0,0" />
+        </StackPanel>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="CANCEL" Width="100" Height="42" IsCancel="True" />
+            <Button x:Name="SaveButton" Content="CREATE" Width="120" Height="42"
+                    Style="{StaticResource PrimaryButton}" Margin="10,0,0,0"
+                    Click="SaveButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

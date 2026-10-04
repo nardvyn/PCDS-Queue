@@ -1,0 +1,184 @@
+﻿<Window x:Class="PCDSQueue.Kiosk.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PCDS Queue Kiosk"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F7FB"
+        MinWidth="1100"
+        MinHeight="700"
+        WindowState="Maximized">
+    <Window.Resources>
+        <Style x:Key="DepartmentCardStyle" TargetType="Button">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderBrush" Value="#E2E8F0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="12" />
+            <Setter Property="Width" Value="300" />
+            <Setter Property="Height" Value="230" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Card"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="14">
+                            <ContentPresenter HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Stretch" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Card" Property="BorderBrush" Value="#1F4E91" />
+                                <Setter TargetName="Card" Property="Background" Value="#F8FAFF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Card" Property="Opacity" Value="0.62" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="78" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="58" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+            <Grid Margin="40,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="46" Height="46" CornerRadius="10" Background="#173F7A">
+                        <TextBlock Text="P" Foreground="White" FontWeight="Bold" FontSize="22"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="PCDS QUEUE" FontSize="18" FontWeight="Bold" Foreground="#172033" />
+                        <TextBlock Text="Self-Service Kiosk" FontSize="12" Foreground="#718096" />
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse x:Name="ServerStatusDot" Width="9" Height="9" Fill="#F59E0B"
+                             Margin="0,0,8,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ServerStatusText" Text="Checking server..."
+                               Foreground="#718096" FontSize="13" VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="40,42,40,36">
+                <TextBlock Text="Welcome to PCDS" HorizontalAlignment="Center"
+                           FontSize="15" Foreground="#1F4E91" FontWeight="SemiBold" />
+                <TextBlock Text="What service do you need?" HorizontalAlignment="Center"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"
+                           FontSize="36" FontWeight="Bold" Foreground="#172033" />
+                <TextBlock Text="Select a department below to get your queue number."
+                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                           Margin="0,12,0,28" FontSize="14" Foreground="#718096" />
+
+                <StackPanel x:Name="LoadingPanel" HorizontalAlignment="Center" Margin="0,34">
+                    <TextBlock Text="Loading available services..." FontSize="14"
+                               Foreground="#718096" />
+                </StackPanel>
+
+                <StackPanel x:Name="ErrorPanel" Visibility="Collapsed"
+                            HorizontalAlignment="Center" Margin="0,28">
+                    <TextBlock x:Name="ErrorText" Text="Unable to connect to the server."
+                               FontSize="15" Foreground="#DC3545" HorizontalAlignment="Center"
+                               TextAlignment="Center" TextWrapping="Wrap" />
+                    <Button Content="TRY AGAIN" Width="160" Height="44" Margin="0,18,0,0"
+                            Background="#1F4E91" Foreground="White" BorderThickness="0"
+                            Cursor="Hand" Click="RetryButton_Click" />
+                </StackPanel>
+
+                <ItemsControl x:Name="DepartmentsItemsControl" Visibility="Collapsed">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel HorizontalAlignment="Center" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource DepartmentCardStyle}"
+                                    Tag="{Binding}" IsEnabled="{Binding IsAvailableForKiosk}"
+                                    Click="DepartmentButton_Click">
+                                <Grid Margin="22">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <Border Width="66" Height="66" CornerRadius="33"
+                                                Background="#EEF4FF" HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding QueuePrefix}" Foreground="#173F7A"
+                                                       FontWeight="Bold" FontSize="27"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="{Binding DepartmentName}" HorizontalAlignment="Center"
+                                                   TextAlignment="Center" TextWrapping="Wrap"
+                                                   Margin="0,17,0,0" FontSize="21" FontWeight="Bold"
+                                                   Foreground="#172033" />
+                                        <TextBlock Text="Get queue number" HorizontalAlignment="Center"
+                                                   Margin="0,6,0,0" FontSize="12" Foreground="#718096" />
+                                        <TextBlock Text="QUEUE CLOSED" HorizontalAlignment="Center"
+                                                   Margin="0,6,0,0" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="#DC3545">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding QueueIsOpen}" Value="False">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Text="KIOSK QUEUE UNAVAILABLE" HorizontalAlignment="Center"
+                                                   Margin="0,6,0,0" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="#DC3545">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding KioskQueueEnabled}" Value="False">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <Border Grid.Row="1" Height="40" CornerRadius="7"
+                                            Background="#1F4E91" Margin="0,12,0,0">
+                                        <TextBlock Text="SELECT" Foreground="White" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="2" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0">
+            <Grid Margin="40,0">
+                <TextBlock Text="Polytechnic College of Davao del Sur" VerticalAlignment="Center"
+                           Foreground="#718096" FontSize="11" />
+                <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                           Foreground="#718096" FontSize="11"
+                           Text="Touch a service above to get started" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

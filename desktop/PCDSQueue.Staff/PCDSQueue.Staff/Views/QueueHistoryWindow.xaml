@@ -1,0 +1,43 @@
+<Window x:Class="PCDSQueue.Staff.Views.QueueHistoryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PCDS Queue - Queue History"
+        Width="1150" Height="720" MinWidth="900" MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        Background="#F5F7FB">
+    <Grid Margin="40">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="25" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <StackPanel>
+                <TextBlock Text="QUEUE HISTORY" FontSize="28" FontWeight="Bold" Foreground="#172033" />
+                <TextBlock Text="Latest 100 queue transactions in your department" FontSize="13" Foreground="#718096" Margin="0,6,0,0" />
+            </StackPanel>
+            <Button Content="BACK TO DASHBOARD" HorizontalAlignment="Right" Width="180" Height="42" Click="BackButton_Click" />
+        </Grid>
+        <Border Grid.Row="2" Background="White" CornerRadius="16" BorderBrush="#E2E8F0" BorderThickness="1" Padding="22">
+            <DataGrid x:Name="HistoryDataGrid"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      GridLinesVisibility="Horizontal"
+                      HeadersVisibility="Column"
+                      BorderThickness="0"
+                      RowHeight="50"
+                      ColumnHeaderHeight="45"
+                      AlternatingRowBackground="#F8FAFC">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="NUMBER" Binding="{Binding QueueNumber}" Width="*" />
+                    <DataGridTextColumn Header="WINDOW" Binding="{Binding WindowDisplay}" Width="*" />
+                    <DataGridTextColumn Header="STAFF" Binding="{Binding StaffName}" Width="1.5*" />
+                    <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="*" />
+                    <DataGridTextColumn Header="CALLED" Binding="{Binding CalledDisplay}" Width="*" />
+                    <DataGridTextColumn Header="COMPLETED" Binding="{Binding CompletedDisplay}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+    </Grid>
+</Window>

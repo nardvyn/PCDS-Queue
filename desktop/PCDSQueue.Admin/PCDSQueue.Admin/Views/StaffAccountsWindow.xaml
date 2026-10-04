@@ -1,0 +1,70 @@
+<UserControl x:Class="PCDSQueue.Admin.Views.StaffAccountsWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BackgroundBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="14" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="14" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Button x:Name="AddStaffButton" Grid.Row="0" Content="+  ADD STAFF"
+                Style="{StaticResource PrimaryButton}" Width="140" Height="42"
+                HorizontalAlignment="Right" Click="AddStaffButton_Click" />
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="1.5*" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="SearchTextBox" Grid.Column="0" Height="40" Padding="12,0"
+                     VerticalContentAlignment="Center" ToolTip="Search name or username"
+                     TextChanged="SearchTextBox_TextChanged" />
+            <ComboBox x:Name="DepartmentFilterComboBox" Grid.Column="2" Height="40"
+                      DisplayMemberPath="DepartmentName"
+                      VerticalContentAlignment="Center" SelectionChanged="Filter_SelectionChanged" />
+            <ComboBox x:Name="StatusFilterComboBox" Grid.Column="4" Height="40"
+                      VerticalContentAlignment="Center" SelectionChanged="Filter_SelectionChanged">
+                <ComboBoxItem Content="All statuses" Tag="ALL" />
+                <ComboBoxItem Content="Active" Tag="ACTIVE" />
+                <ComboBoxItem Content="Inactive" Tag="INACTIVE" />
+                <ComboBoxItem Content="Suspended" Tag="SUSPENDED" />
+            </ComboBox>
+            <Button Grid.Column="6" Content="REFRESH" Width="90" Height="36"
+                    Click="RefreshButton_Click" />
+        </Grid>
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="EditStaffButton" Content="EDIT" Width="80" Height="36"
+                    IsEnabled="False" Click="EditStaffButton_Click" />
+            <Button x:Name="ResetPasswordButton" Content="RESET PASSWORD" Width="145" Height="36"
+                    Margin="8,0,0,0" IsEnabled="False" Click="ResetPasswordButton_Click" />
+            <Button x:Name="ToggleStatusButton" Content="DEACTIVATE" Width="130" Height="36"
+                    Margin="8,0,0,0" IsEnabled="False" Click="ToggleStatusButton_Click" />
+        </StackPanel>
+        <TextBlock x:Name="StaffErrorText" Grid.Row="5" Foreground="#DC3545"
+                   TextWrapping="Wrap" Visibility="Collapsed" />
+        <Border Grid.Row="6" Style="{StaticResource DashboardCard}" Padding="18">
+            <DataGrid x:Name="StaffGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                      CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      BorderThickness="0" RowHeight="50" ColumnHeaderHeight="44"
+                      AlternatingRowBackground="#F8FAFC" Background="White"
+                      SelectionChanged="StaffGrid_SelectionChanged">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="NAME" Binding="{Binding FullName}" Width="1.5*" />
+                    <DataGridTextColumn Header="USERNAME" Binding="{Binding Username}" Width="*" />
+                    <DataGridTextColumn Header="DEPARTMENT" Binding="{Binding DepartmentName}" Width="1.2*" />
+                    <DataGridTextColumn Header="STATUS" Binding="{Binding AccountStatus}" Width="120" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+    </Grid>
+</UserControl>

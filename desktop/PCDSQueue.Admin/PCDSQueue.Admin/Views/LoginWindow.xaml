@@ -1,0 +1,80 @@
+<Window x:Class="PCDSQueue.Admin.Views.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PCDS Queue - Administration"
+        Width="1050" Height="650" MinWidth="900" MinHeight="580"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1.05*" />
+            <ColumnDefinition Width="0.95*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Background="{StaticResource PrimaryBrush}">
+            <Grid Margin="58">
+                <StackPanel VerticalAlignment="Center">
+                    <Border Width="68" Height="68" Background="White" CornerRadius="14"
+                            HorizontalAlignment="Left">
+                        <TextBlock Text="P" FontSize="30" FontWeight="Bold"
+                                   Foreground="{StaticResource PrimaryBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="PCDS QUEUE" FontSize="30" FontWeight="Bold"
+                               Foreground="White" Margin="0,28,0,0" />
+                    <TextBlock Text="ADMINISTRATION" FontSize="13" FontWeight="SemiBold"
+                               Foreground="#BFD1ED" Margin="0,6,0,0" />
+                    <TextBlock Text="Manage departments, service windows, staff accounts, and campus queues."
+                               TextWrapping="Wrap" MaxWidth="390" HorizontalAlignment="Left"
+                               Foreground="#D9E4F5" FontSize="14" LineHeight="23"
+                               Margin="0,26,0,0" />
+                    <StackPanel Margin="0,34,0,0">
+                        <TextBlock Text="Department management" Foreground="White" Margin="0,0,0,12" />
+                        <TextBlock Text="Staff and service windows" Foreground="White" Margin="0,0,0,12" />
+                        <TextBlock Text="Live queue monitoring" Foreground="White" Margin="0,0,0,12" />
+                        <TextBlock Text="Reports and queue history" Foreground="White" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="36">
+            <Border Width="390" Padding="38" Background="White" CornerRadius="12"
+                    BorderBrush="#E2E8F0" BorderThickness="1"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="ADMIN LOGIN" FontSize="27" FontWeight="Bold"
+                               Foreground="{StaticResource TextBrush}" />
+                    <TextBlock Text="Sign in to manage the PCDS Queue System"
+                               Foreground="{StaticResource MutedTextBrush}"
+                               FontSize="13" Margin="0,7,0,30" />
+
+                    <TextBlock Text="USERNAME" FontSize="11" FontWeight="SemiBold"
+                               Foreground="#4A5568" Margin="0,0,0,7" />
+                    <TextBox x:Name="UsernameTextBox" Style="{StaticResource ModernTextBox}" />
+
+                    <TextBlock Text="PASSWORD" FontSize="11" FontWeight="SemiBold"
+                               Foreground="#4A5568" Margin="0,20,0,7" />
+                    <PasswordBox x:Name="PasswordBox" Style="{StaticResource ModernPasswordBox}"
+                                 KeyDown="PasswordBox_KeyDown" />
+
+                    <TextBlock x:Name="ErrorText" Foreground="#DC3545" FontSize="12"
+                               TextWrapping="Wrap" Visibility="Collapsed" Margin="0,12,0,0" />
+
+                    <Button x:Name="LoginButton" Content="LOGIN AS ADMINISTRATOR"
+                            Style="{StaticResource PrimaryButton}" IsEnabled="False"
+                            Margin="0,25,0,0" Click="LoginButton_Click" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                Margin="0,22,0,0">
+                        <Ellipse x:Name="ServerStatusDot" Width="7" Height="7"
+                                 Fill="#9CA3AF" Margin="0,0,7,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ServerStatusText" Text="Checking server..."
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

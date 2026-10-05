@@ -91,9 +91,12 @@ gunicorn run:app --bind 0.0.0.0:$PORT
 
 `backend/run.py` exports the Flask application as `app`. Gunicorn is included
 for non-Windows installs; Waitress remains the production server for the
-Windows campus deployment. Set the required Flask/JWT and database environment
-variables in Railway before enabling API routes that need MySQL. Do not commit
-the local `backend/.env` file. This Railway command is separate from
+Windows campus deployment. Set `MYSQL_URL` to Railway's `${{MySQL.MYSQL_URL}}`,
+`APP_ENV=Production`, and a unique `JWT_SECRET_KEY` in Railway. The Flask config
+accepts Railway's `mysql://` URL and selects the PyMySQL driver; local
+`DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD` settings remain the
+fallback. `DATABASE_URL` is also accepted when `MYSQL_URL` is absent. Do not
+commit the local `backend/.env` file. This Railway command is separate from
 `python serve.py`, which is intended for the Windows server.
 
 ## 6. Build the Android APK

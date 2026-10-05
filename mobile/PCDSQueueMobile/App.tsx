@@ -5,12 +5,15 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
 import { useAudioPlayer } from 'expo-audio';
 import Slider from '@react-native-community/slider';
+import NetInfo from '@react-native-community/netinfo';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -23,6 +26,7 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
+  acknowledgeQueue,
   ApiError,
   cancelMobileQueue,
   checkApiHealth,
@@ -71,6 +75,7 @@ type QueueAlertPresentation = {
   windowName: string | null;
   windowNumber: number | null;
 };
+type ConnectionType = 'CONNECTED' | 'NO_NETWORK' | 'SERVER_OFFLINE';
 
 const DEFAULT_PREFERENCES: MobilePreferences = {
   queueAlerts: true,
@@ -90,14 +95,14 @@ const DEFAULT_PREFERENCES: MobilePreferences = {
 const lightColors = {
   // Mirrors the shared desktop resource dictionary.
   ink: '#172033',
-  green: '#173F7A',
-  greenDark: '#102E68',
-  primarySurface: '#102E68',
+  green: '#077F8D',
+  greenDark: '#066A76',
+  primarySurface: '#077F8D',
   onPrimary: '#FFFFFF',
-  onPrimaryMuted: '#BFD1ED',
+  onPrimaryMuted: '#C8EBED',
   primaryDivider: 'rgba(255,255,255,0.18)',
-  mint: '#E8F0FC',
-  lime: '#D9E4F5',
+  mint: '#E6F4F5',
+  lime: '#E3F4F5',
   background: '#F5F7FB',
   surface: '#FFFFFF',
   muted: '#718096',
@@ -110,8 +115,8 @@ const lightColors = {
   redBg: '#FCEAEA',
   offline: '#DC3545',
   iconOnPrimary: '#FFFFFF',
-  scanCaption: '#D9E4F5',
-  scanOverlay: 'rgba(16,46,104,0.36)',
+  scanCaption: '#E3F4F5',
+  scanOverlay: 'rgba(6,106,118,0.36)',
   scanBack: 'rgba(0,0,0,0.4)',
   scanButtonText: '#FFFFFF',
   inactiveStatus: '#E9EEF0',
@@ -120,14 +125,14 @@ const lightColors = {
 
 const darkColors: ThemeColors = {
   ink: '#F1F5F9',
-  green: '#A9C7F2',
-  greenDark: '#D5E4FA',
-  primarySurface: '#17345F',
+  green: '#55BBC3',
+  greenDark: '#C6E8EA',
+  primarySurface: '#066A76',
   onPrimary: '#FFFFFF',
-  onPrimaryMuted: '#D5E4FA',
+  onPrimaryMuted: '#C6E8EA',
   primaryDivider: 'rgba(255,255,255,0.24)',
   mint: '#263A55',
-  lime: '#D5E4FA',
+  lime: '#C6E8EA',
   background: '#0F1724',
   surface: '#182435',
   muted: '#B2C0D2',
@@ -140,7 +145,7 @@ const darkColors: ThemeColors = {
   redBg: '#3D252B',
   offline: '#FF9292',
   iconOnPrimary: '#FFFFFF',
-  scanCaption: '#D5E4FA',
+  scanCaption: '#C6E8EA',
   scanOverlay: 'rgba(4,12,24,0.58)',
   scanBack: 'rgba(0,0,0,0.52)',
   scanButtonText: '#FFFFFF',
@@ -154,6 +159,8 @@ const ThemeContext = createContext<AppTheme | null>(null);
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
+  const [showSplash, setShowSplash] = useState(true);
+  const [splashStatus, setSplashStatus] = useState('Connecting to queue server...');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [apiOnline, setApiOnline] = useState(false);
   const [deviceIdentifier, setDeviceIdentifier] = useState('');
@@ -169,6 +176,10 @@ export default function App() {
   const preferencesRef = useRef(preferences);
   const [isBusy, setIsBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [hasExistingQueueConflict, setHasExistingQueueConflict] = useState(false);
+  const [connectionType, setConnectionType] = useState<ConnectionType>('CONNECTED');
+  const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [connectionRestored, setConnectionRestored] = useState(false);
   const announcementCursor = useRef<{ queueId: number | null; eventId: number | null }>({
     queueId: null,
     eventId: null,
@@ -179,6 +190,40 @@ export default function App() {
   const announcementPlayer = useAudioPlayer(require('./assets/notification.wav'));
   const activeQueueId = ticket?.queue_id;
   const activeQueueStatus = ticket?.status;
+
+  const checkConnection = useCallback(async () => {
+    const network = await NetInfo.fetch();
+    if (!network.isConnected) {
+      setApiOnline(false);
+      setConnectionType('NO_NETWORK');
+      setShowConnectionModal(true);
+      return false;
+    }
+    try {
+      await checkApiHealth();
+      setApiOnline(true);
+      if (ticket?.queue_id) {
+        const latest = await getQueueStatus(ticket.queue_id);
+        setTicket((current) => current?.queue_id === ticket.queue_id
+          ? { ...current, ...withoutStatusDepartment(latest) }
+          : current);
+      }
+      setConnectionType('CONNECTED');
+      setShowConnectionModal((wasVisible) => {
+        if (wasVisible) {
+          setConnectionRestored(true);
+          setTimeout(() => setConnectionRestored(false), 3000);
+        }
+        return false;
+      });
+      return true;
+    } catch {
+      setApiOnline(false);
+      setConnectionType('SERVER_OFFLINE');
+      setShowConnectionModal(true);
+      return false;
+    }
+  }, [ticket]);
 
   useEffect(() => {
     let mounted = true;
@@ -213,9 +258,15 @@ export default function App() {
         }
 
         await checkApiHealth();
-        if (mounted) setApiOnline(true);
+        if (mounted) {
+          setApiOnline(true);
+          setSplashStatus('Queue server connected');
+        }
       } catch {
-        if (mounted) setApiOnline(false);
+        if (mounted) {
+          setApiOnline(false);
+          setSplashStatus('Starting PCDS Queue...');
+        }
       }
     };
 
@@ -223,6 +274,24 @@ export default function App() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((network) => {
+      if (!network.isConnected) {
+        setApiOnline(false);
+        setConnectionType('NO_NETWORK');
+        setShowConnectionModal(true);
+      } else {
+        void checkConnection();
+      }
+    });
+    return unsubscribe;
+  }, [checkConnection]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2500);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -274,7 +343,11 @@ export default function App() {
         );
 
       } catch {
-        if (mounted) setApiOnline(false);
+        if (mounted) {
+          setApiOnline(false);
+          setConnectionType('SERVER_OFFLINE');
+          setShowConnectionModal(true);
+        }
       } finally {
         refreshing = false;
       }
@@ -344,9 +417,12 @@ export default function App() {
           }
         }
         cursor.eventId = Math.max(cursor.eventId, response.next_after_event_id);
-      } catch (error) {
-        if (mounted) setApiOnline(false);
-        console.warn('Queue announcement polling failed; status polling will continue.', error);
+      } catch {
+        if (mounted) {
+          setApiOnline(false);
+          setConnectionType('SERVER_OFFLINE');
+          setShowConnectionModal(true);
+        }
       } finally {
         refreshing = false;
       }
@@ -473,10 +549,12 @@ export default function App() {
     }
     setIsBusy(true);
     setErrorMessage('');
+    setHasExistingQueueConflict(false);
     try {
       const generated = await generateMobileQueue(
         qr.department.department_id,
         deviceIdentifier,
+        qr.token,
       );
       const status = await getQueueStatus(generated.queue_id);
       const activeTicket: ActiveTicket = {
@@ -495,6 +573,7 @@ export default function App() {
       const apiError = error instanceof ApiError ? error : null;
       const existingQueue = (apiError?.payload as { queue?: { queue_id?: number } } | null)?.queue;
       if (apiError?.statusCode === 409 && existingQueue?.queue_id) {
+        setHasExistingQueueConflict(true);
         try {
           const status = await getQueueStatus(existingQueue.queue_id);
           const resumed: ActiveTicket = {
@@ -512,10 +591,37 @@ export default function App() {
           setScreen('ticket');
           setValidatedQr(null);
           setDepartmentStatus(null);
+          setHasExistingQueueConflict(false);
           return true;
         } catch {
           // Show the original conflict if the active ticket cannot be resumed.
         }
+      }
+      const qrReason = (apiError?.payload as { reason?: string } | null)?.reason;
+      if (qrReason === 'EXPIRED' || qrReason === 'INACTIVE' || qrReason === 'INVALID') {
+        setValidatedQr(null);
+        setDepartmentStatus(null);
+        setScreen('home');
+        if (qrReason === 'EXPIRED') {
+          Alert.alert(
+            'QR Code Expired',
+            'This QR code has expired. Please scan the latest PCDS Queue QR code.',
+          );
+        } else if (qrReason === 'INACTIVE') {
+          Alert.alert('QR Code Inactive', 'This QR code is no longer active.');
+        } else {
+          Alert.alert(
+            'Invalid QR Code',
+            'This QR code is not recognized by the PCDS Queue System.',
+          );
+        }
+        return false;
+      }
+      if (!apiError || apiError.statusCode >= 500) {
+        setApiOnline(false);
+        setConnectionType('SERVER_OFFLINE');
+        setShowConnectionModal(true);
+        return false;
       }
       setErrorMessage(getErrorMessage(error));
       return false;
@@ -539,6 +645,34 @@ export default function App() {
       setScreen('confirm');
       return true;
     } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode >= 500) {
+        setApiOnline(false);
+        setConnectionType('SERVER_OFFLINE');
+        setShowConnectionModal(true);
+        return false;
+      }
+      const reason = (error.payload as { reason?: string } | null)?.reason;
+      if (reason === 'EXPIRED') {
+        setScreen('home');
+        Alert.alert(
+          'QR Code Expired',
+          'This QR code has expired. Please scan the latest PCDS Queue QR code.',
+        );
+        return false;
+      }
+      if (reason === 'INACTIVE') {
+        setScreen('home');
+        Alert.alert('QR Code Inactive', 'This QR code is no longer active.');
+        return false;
+      }
+      if (reason === 'INVALID') {
+        setScreen('home');
+        Alert.alert(
+          'Invalid QR Code',
+          'This QR code is not recognized by the PCDS Queue System.',
+        );
+        return false;
+      }
       setErrorMessage(getErrorMessage(error));
       return false;
     } finally {
@@ -588,6 +722,20 @@ export default function App() {
     }
   };
 
+  const handleOnMyWay = async () => {
+    if (!ticket) return;
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      await acknowledgeQueue(ticket.queue_id);
+      setTicket((current) => current ? { ...current, customer_acknowledged: true } : null);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   const updatePreferences = (updates: Partial<MobilePreferences>) => {
     setPreferences((current) => ({ ...current, ...updates }));
     setPreferencesError('');
@@ -603,7 +751,9 @@ export default function App() {
     });
   };
 
-  const appContent = screen === 'scanner' ? (
+  const appContent = showSplash ? (
+    <SplashScreen status={splashStatus} />
+  ) : screen === 'scanner' ? (
     <QrScannerScreen
       cameraPermissionGranted={!!cameraPermission?.granted}
       onRequestCameraPermission={() => void openScanner()}
@@ -627,7 +777,7 @@ export default function App() {
           <View style={styles.header}>
             <View style={styles.brandRow}>
               <View style={styles.brandMark}>
-                <Text style={styles.brandLetter}>P</Text>
+                <Image source={require('./assets/pcds-logo.png')} style={styles.brandLogo} resizeMode="contain" />
               </View>
               <View>
                 <Text style={styles.brandName}>PCDS QUEUE</Text>
@@ -655,9 +805,9 @@ export default function App() {
           {screen === 'home' && (
             <>
               <View style={styles.hero}>
-                <Text style={styles.eyebrow}>YOUR CAMPUS, IN ORDER</Text>
-                <Text style={styles.heroTitle}>Join a queue.</Text>
-                <Text style={styles.heroCopy}>Get your queue number without waiting in line.</Text>
+                <Text style={styles.eyebrow}>WELCOME TO PCDS</Text>
+                <Text style={styles.heroTitle}>Join a Queue</Text>
+                <Text style={styles.heroCopy}>Scan a campus service QR code to get your queue number without waiting in line.</Text>
               </View>
 
               {ticket && (
@@ -721,9 +871,9 @@ export default function App() {
               {!validatedQr.mobile_queue_enabled && <InlineNotice message="Mobile queue entry is currently disabled by the administrator." tone="warning" />}
               {!!errorMessage && <InlineNotice message={errorMessage} tone="error" />}
               <ActionButton
-                title={isBusy ? 'Joining queue…' : 'JOIN QUEUE'}
+                title={hasExistingQueueConflict ? 'ACTIVE QUEUE FOUND' : isBusy ? 'Joining queue…' : 'JOIN QUEUE'}
                 onPress={() => void joinQueue(validatedQr)}
-                disabled={isBusy || !validatedQr.department.queue_is_open || !validatedQr.mobile_queue_enabled}
+                disabled={isBusy || hasExistingQueueConflict || !validatedQr.department.queue_is_open || !validatedQr.mobile_queue_enabled}
                 icon="arrow-right"
               />
             </View>
@@ -784,6 +934,21 @@ export default function App() {
                 />
               )}
 
+              {ticket.status === 'CALLED' && (ticket.call_countdown_enabled || ticket.customer_acknowledgement_enabled) && (
+                <View style={styles.callGraceCard}>
+                  {ticket.call_countdown_enabled && <>
+                    <Text style={styles.callGraceLabel}>TIME TO PROCEED</Text>
+                    <Text style={styles.callGraceTimer}>{formatGraceTime(ticket.grace_remaining_seconds)}</Text>
+                  </>}
+                  {ticket.customer_acknowledgement_enabled && (ticket.customer_acknowledged ? (
+                    <Text style={styles.callGraceAcknowledged}>✓ STAFF NOTIFIED — YOU&apos;RE ON YOUR WAY</Text>
+                  ) : (
+                    <Pressable style={styles.callGraceButton} onPress={() => void handleOnMyWay()} disabled={isBusy}>
+                      <Text style={styles.callGraceButtonText}>{isBusy ? 'NOTIFYING…' : "I'M ON MY WAY"}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
               <View style={styles.ticketCard}>
                 <Text style={styles.ticketLabel}>QUEUE NUMBER</Text>
                 <Text style={styles.ticketNumber}>{ticket.queue_number}</Text>
@@ -865,16 +1030,90 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeContext.Provider value={appTheme}>
         <View style={styles.appRoot}>
+          {connectionRestored && (
+            <View style={styles.connectionRestoredBanner}>
+              <Text style={styles.connectionRestoredText}>CONNECTION RESTORED — queue status is up to date.</Text>
+            </View>
+          )}
           {appContent}
           {activeAlert && (
             <QueueAlertOverlay alert={activeAlert} onAcknowledge={() => setActiveAlert(null)} />
           )}
+          <ConnectionModal
+            visible={showConnectionModal}
+            connectionType={connectionType}
+            ticket={ticket}
+            onRetry={() => void checkConnection()}
+          />
         </View>
       </ThemeContext.Provider>
     </SafeAreaProvider>
   );
 }
 
+function SplashScreen({ status }: { status: string }) {
+  const { styles } = useAppTheme();
+  return (
+    <SafeAreaView style={styles.splashSafeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#077F8D" translucent={false} />
+      <View style={styles.splashContent}>
+        <View style={styles.splashLogoShell}>
+          <Image source={require('./assets/pcds-logo.png')} style={styles.splashLogo} resizeMode="contain" />
+        </View>
+        <Text style={styles.splashTitle}>PCDS QUEUE</Text>
+        <Text style={styles.splashSubtitle}>Campus Queue Management System</Text>
+        <View style={styles.splashLoadingRow}>
+          <ActivityIndicator size="small" color="#FFFFFF" />
+          <Text style={styles.splashLoadingText}>{status}</Text>
+        </View>
+        <View style={styles.splashFooter}>
+          <Text style={styles.splashSchool}>POLYTECHNIC COLLEGE OF</Text>
+          <Text style={styles.splashSchool}>DAVAO DEL SUR, INC.</Text>
+          <Text style={styles.splashLocation}>Digos City</Text>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function ConnectionModal({
+  visible,
+  connectionType,
+  ticket,
+  onRetry,
+}: {
+  visible: boolean;
+  connectionType: ConnectionType;
+  ticket: ActiveTicket | null;
+  onRetry: () => void;
+}) {
+  const { colors, styles } = useAppTheme();
+  const noNetwork = connectionType === 'NO_NETWORK';
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onRetry}>
+      <View style={styles.connectionOverlay}>
+        <View style={styles.connectionCard} accessibilityViewIsModal>
+          <Feather name="wifi-off" size={34} color={colors.amber} />
+          <Text style={styles.connectionTitle}>CONNECTION LOST</Text>
+          <Text style={styles.connectionStatus}>{noNetwork ? 'No Network Connection' : 'Queue Server Offline'}</Text>
+          {ticket && <>
+            <Text style={styles.connectionLabel}>YOUR QUEUE NUMBER</Text>
+            <Text style={styles.connectionNumber}>{ticket.queue_number}</Text>
+            <Text style={styles.connectionDepartment}>{typeof ticket.department === 'string' ? ticket.department : ticket.department.department_name}</Text>
+          </>}
+          <Text style={styles.connectionMessage}>
+            {noNetwork
+              ? 'Your ticket is saved. Connect to the PCDS network to receive live updates.'
+              : 'Your ticket is saved. Live queue updates are temporarily unavailable.'}
+          </Text>
+          <Pressable style={styles.connectionRetry} onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry queue server connection">
+            <Text style={styles.connectionRetryText}>TRY AGAIN</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 function QueueAlertOverlay({
   alert,
   onAcknowledge,
@@ -958,7 +1197,7 @@ function QrScannerScreen({
 
   return (
     <View style={styles.scannerRoot}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.greenDark} translucent={false} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.primarySurface} translucent={false} />
       {cameraPermissionGranted ? (
         <CameraView
           style={StyleSheet.absoluteFill}
@@ -1189,7 +1428,7 @@ function SettingsScreen({
 
       <SettingsSection title="About">
         <View style={styles.aboutRow}>
-          <View style={styles.brandMark}><Text style={styles.brandLetter}>P</Text></View>
+          <View style={styles.brandMark}><Image source={require('./assets/pcds-logo.png')} style={styles.brandLogo} resizeMode="contain" /></View>
           <View style={styles.flex}>
             <Text style={styles.aboutName}>PCDS Queue</Text>
             <Text style={styles.aboutVersion}>Version 1.0.0</Text>
@@ -1241,6 +1480,8 @@ function SettingsToggle({
         disabled={disabled}
         onValueChange={onValueChange}
         trackColor={{ false: colors.line, true: colors.green }}
+        thumbColor={value ? colors.green : colors.surface}
+        ios_backgroundColor={colors.line}
         accessibilityLabel={title}
       />
     </View>
@@ -1358,6 +1599,11 @@ function ActionButton({
   );
 }
 
+function formatGraceTime(seconds: number): string {
+  const safeSeconds = Math.max(0, seconds || 0);
+  return `${String(Math.floor(safeSeconds / 60)).padStart(2, '0')}:${String(safeSeconds % 60).padStart(2, '0')}`;
+}
+
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
 }
@@ -1419,6 +1665,30 @@ function createStyles(colors: ThemeColors) {
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   brandMark: { width: 42, height: 42, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   brandLetter: { color: colors.green, fontSize: 20, fontWeight: '900' },
+  brandLogo: { width: 34, height: 34 },
+  splashSafeArea: { flex: 1, backgroundColor: '#077F8D' },
+  splashContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
+  splashLogoShell: { width: 166, height: 166, borderRadius: 83, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 },
+  splashLogo: { width: 148, height: 148 },
+  splashTitle: { color: '#FFFFFF', fontSize: 31, fontWeight: '900', letterSpacing: 2, marginTop: 25 },
+  splashSubtitle: { color: '#D8F1F3', fontSize: 15, textAlign: 'center', marginTop: 7 },
+  splashLoadingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 40 },
+  splashLoadingText: { color: '#FFFFFF', marginLeft: 12, fontSize: 13 },
+  splashFooter: { position: 'absolute', bottom: 45, alignItems: 'center' },
+  splashSchool: { color: '#FFFFFF', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  splashLocation: { color: '#BDE5E8', fontSize: 11, marginTop: 5 },
+  connectionRestoredBanner: { position: 'absolute', top: 52, left: 16, right: 16, backgroundColor: colors.mint, borderColor: colors.green, borderWidth: 1, borderRadius: 10, padding: 12, zIndex: 20 },
+  connectionRestoredText: { color: colors.greenDark, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  connectionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 },
+  connectionCard: { backgroundColor: colors.surface, borderRadius: 18, padding: 28, alignItems: 'center' },
+  connectionTitle: { color: colors.amber, fontSize: 13, fontWeight: '900', letterSpacing: 1.2, marginTop: 10 },
+  connectionStatus: { color: colors.ink, fontSize: 21, fontWeight: '900', marginTop: 8, textAlign: 'center' },
+  connectionLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', marginTop: 22 },
+  connectionNumber: { color: colors.green, fontSize: 46, fontWeight: '900', marginTop: 2 },
+  connectionDepartment: { color: colors.muted, fontSize: 14, fontWeight: '700' },
+  connectionMessage: { color: colors.muted, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 20 },
+  connectionRetry: { width: '100%', minHeight: 48, backgroundColor: colors.primarySurface, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginTop: 24 },
+  connectionRetryText: { color: colors.white, fontSize: 13, fontWeight: '900', letterSpacing: 0.6 },
   brandName: { color: colors.ink, fontSize: 14, fontWeight: '800', letterSpacing: 1.1 },
   brandCaption: { color: colors.muted, fontSize: 9, fontWeight: '700', marginTop: 3, letterSpacing: 0.8 },
   connectionRow: { flexDirection: 'row', alignItems: 'center', minHeight: 31, gap: 7, borderBottomWidth: 1, borderBottomColor: colors.line, paddingBottom: 10 },
@@ -1428,7 +1698,7 @@ function createStyles(colors: ThemeColors) {
   eyebrow: { color: colors.green, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   heroTitle: { color: colors.ink, fontSize: 38, fontWeight: '800', marginTop: 9 },
   heroCopy: { color: colors.muted, fontSize: 15, lineHeight: 22, marginTop: 8, maxWidth: 310 },
-  scanButton: { minHeight: 84, backgroundColor: colors.green, borderRadius: 9, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 13, marginTop: 14 },
+  scanButton: { minHeight: 84, backgroundColor: colors.primarySurface, borderRadius: 9, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 13, marginTop: 14 },
   disabledButton: { opacity: 0.48 },
   scanIcon: { width: 46, height: 46, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
   scanButtonText: { flex: 1 },
@@ -1499,12 +1769,18 @@ function createStyles(colors: ThemeColors) {
   queueInfoItem: { flex: 1, alignItems: 'center', paddingHorizontal: 5 },
   queueInfoValue: { color: colors.ink, fontSize: 17, fontWeight: '800' },
   queueInfoLabel: { color: colors.muted, fontSize: 8, fontWeight: '800', letterSpacing: 0.45, textAlign: 'center', marginTop: 5 },
-  actionButton: { minHeight: 52, borderRadius: 9, backgroundColor: colors.green, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18, marginTop: 16 },
+  actionButton: { minHeight: 52, borderRadius: 9, backgroundColor: colors.primarySurface, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18, marginTop: 16 },
   actionButtonText: { color: colors.white, fontSize: 12, fontWeight: '900', letterSpacing: 0.6 },
   ticketHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   statusPill: { minHeight: 27, borderRadius: 99, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.3 },
+  callGraceCard: { backgroundColor: colors.primarySurface, borderRadius: 10, padding: 20, marginTop: 16, alignItems: 'center' },
+  callGraceLabel: { color: colors.onPrimaryMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  callGraceTimer: { color: colors.onPrimary, fontSize: 42, fontWeight: '900', marginTop: 4 },
+  callGraceButton: { width: '100%', backgroundColor: colors.surface, borderRadius: 9, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
+  callGraceButtonText: { color: colors.greenDark, fontSize: 12, fontWeight: '900' },
+  callGraceAcknowledged: { color: colors.lime, fontSize: 12, fontWeight: '900', marginTop: 16, textAlign: 'center' },
   ticketCard: { backgroundColor: colors.primarySurface, borderRadius: 9, padding: 22, marginTop: 22 },
   ticketLabel: { color: colors.onPrimaryMuted, fontSize: 9, fontWeight: '800', letterSpacing: 1.1, textAlign: 'center' },
   ticketNumber: { color: colors.onPrimary, fontSize: 58, fontWeight: '900', textAlign: 'center', marginTop: 9 },
@@ -1526,7 +1802,7 @@ function createStyles(colors: ThemeColors) {
   cancelText: { color: colors.red, fontSize: 12, fontWeight: '800' },
   notice: { borderRadius: 13, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 14 },
   noticeText: { flex: 1, fontSize: 12, lineHeight: 18, fontWeight: '600' },
-  scannerRoot: { flex: 1, backgroundColor: colors.greenDark },
+  scannerRoot: { flex: 1, backgroundColor: colors.primarySurface },
   scannerOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: 26, backgroundColor: colors.scanOverlay },
   scannerBack: { position: 'absolute', top: 60, left: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: colors.scanBack },
   scanFrame: { width: 250, height: 250, borderRadius: 12, borderWidth: 2, borderColor: colors.lime, marginBottom: 29 },

@@ -1,9 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL_STORAGE_KEY = 'pcds.apiBaseUrl';
-// Android devices on the same Wi-Fi network reach the Flask PC through its LAN IP.
-// `10.0.2.2` works only from an Android emulator, never from a physical phone.
-const DEFAULT_API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.102:5000';
+const DEFAULT_API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL || 'https://pcds-queue-production.up.railway.app';
 
 let apiBaseUrl = normalizeBaseUrl(DEFAULT_API_BASE_URL);
 
@@ -20,6 +19,7 @@ export type ValidatedQr = {
   department: Department;
   expires_at: string;
   mobile_queue_enabled: boolean;
+  token: string;
 };
 
 export type QueueTicket = {
@@ -47,6 +47,12 @@ export type QueueStatus = {
   window_number: number | null;
   window_name: string | null;
   called_at: string | null;
+  grace_period_seconds: number;
+  grace_remaining_seconds: number;
+  call_countdown_enabled: boolean;
+  customer_acknowledgement_enabled: boolean;
+  can_no_show: boolean;
+  customer_acknowledged: boolean;
 };
 
 export type DepartmentQueueStatus = {
@@ -109,12 +115,16 @@ export async function checkApiHealth(): Promise<void> {
 }
 
 export async function validateQrToken(token: string): Promise<ValidatedQr> {
-  return request<ValidatedQr>(`api/qr/validate/${encodeURIComponent(token)}`);
+  const response = await request<Omit<ValidatedQr, 'token'>>(
+    `api/qr/validate/${encodeURIComponent(token)}`,
+  );
+  return { ...response, token };
 }
 
 export async function generateMobileQueue(
   departmentId: number,
   deviceIdentifier: string,
+  qrToken: string,
   notificationToken?: string,
 ): Promise<QueueTicket> {
   const response = await request<{ queue: QueueTicket }>('api/queue/generate', {
@@ -123,6 +133,7 @@ export async function generateMobileQueue(
       department_id: departmentId,
       source: 'MOBILE',
       device_identifier: deviceIdentifier,
+      qr_token: qrToken,
       notification_token: notificationToken,
     }),
   });
@@ -132,6 +143,10 @@ export async function generateMobileQueue(
 export async function getQueueStatus(queueId: number): Promise<QueueStatus> {
   return request<QueueStatus>(`api/queue/${queueId}/status`);
 }
+export async function acknowledgeQueue(queueId: number): Promise<{ customer_acknowledged: boolean }> {
+  return request(`api/queue/${queueId}/acknowledge`, { method: 'POST' });
+}
+
 export async function getQueueAnnouncementEvents(
   queueId: number,
   deviceIdentifier: string,

@@ -79,9 +79,14 @@ The implemented mobile application uses the Flask API directly through
 | --- | --- |
 | Validate QR | `GET /api/qr/validate/{token}` |
 | Read department service information | `GET /api/queue/status/{department_id}` |
-| Join queue | `POST /api/queue/generate` with source `MOBILE` |
+| Join queue | `POST /api/queue/generate` with source `MOBILE`, the scanned `qr_token`, and matching `department_id` |
 | Refresh ticket | `GET /api/queue/{queue_id}/status` |
 | Cancel ticket | `POST /api/queue/{queue_id}/cancel` |
+
+QR validation distinguishes invalid, expired, and inactive codes. The queue
+generation endpoint revalidates the token, expiration, active state, department,
+and mobile-queue setting before issuing a ticket; scanner-side validation alone
+does not authorize queue entry.
 
 For a physical phone, configure `EXPO_PUBLIC_API_URL` at build time with the
 Flask server's campus-LAN or HTTPS address. `127.0.0.1` refers to the phone

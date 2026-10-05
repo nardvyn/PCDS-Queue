@@ -4,7 +4,7 @@
     "slug": "PCDSQueueMobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/pcds-queue-icon.png",
     "userInterfaceStyle": "light",
     "plugins": [
       [
@@ -30,10 +30,8 @@
     "android": {
       "package": "edu.pcds.queue.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#077F8D",
+        "foregroundImage": "./assets/pcds-queue-adaptive.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [

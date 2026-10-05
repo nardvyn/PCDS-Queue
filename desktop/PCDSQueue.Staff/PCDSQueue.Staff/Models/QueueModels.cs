@@ -15,6 +15,15 @@ public sealed class QueueItemModel
 
     [JsonPropertyName("window_id")]
     public int? WindowId { get; init; }
+
+    [JsonPropertyName("grace_remaining_seconds")]
+    public int GraceRemainingSeconds { get; init; }
+
+    [JsonPropertyName("can_no_show")]
+    public bool CanNoShow { get; init; }
+
+    [JsonPropertyName("customer_acknowledged")]
+    public bool CustomerAcknowledged { get; init; }
 }
 
 public sealed class QueueStatusResponse

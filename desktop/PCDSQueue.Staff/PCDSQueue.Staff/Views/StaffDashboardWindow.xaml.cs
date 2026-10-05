@@ -169,7 +169,20 @@ public partial class StaffDashboardWindow : Window
             NextButton.IsEnabled = _serverOnline && _currentQueue is null && status.WaitingCount > 0;
             RecallButton.IsEnabled = _serverOnline && _currentQueue is not null;
             CompleteButton.IsEnabled = _serverOnline && _currentQueue is not null;
-            NoShowButton.IsEnabled = _serverOnline && _currentQueue is not null;
+            var canNoShow = _currentQueue?.CanNoShow == true;
+            NoShowButton.IsEnabled = _serverOnline && _currentQueue is not null && canNoShow;
+            NoShowButton.Content = "NO SHOW";
+            GraceStatusText.Visibility = _currentQueue is null
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            GraceStatusText.Text = _currentQueue is null
+                ? string.Empty
+                : canNoShow
+                    ? "GRACE PERIOD ENDED - NO SHOW IS AVAILABLE"
+                    : $"NO SHOW AVAILABLE IN {FormatGraceTime(_currentQueue.GraceRemainingSeconds)}";
+            CurrentWindowText.Text = _currentQueue?.CustomerAcknowledged == true
+                ? $"{_shift.DisplayDepartment.ToUpperInvariant()} • WINDOW {_shift.WindowNumber:00} • CUSTOMER ACKNOWLEDGED"
+                : CurrentWindowText.Text;
         }
         catch (Exception ex)
         {
@@ -180,6 +193,9 @@ public partial class StaffDashboardWindow : Window
             _isRefreshing = false;
         }
     }
+
+    private static string FormatGraceTime(int seconds) =>
+        $"{Math.Max(0, seconds) / 60:00}:{Math.Max(0, seconds) % 60:00}";
 
     private async void NextButton_Click(object sender, RoutedEventArgs e)
     {

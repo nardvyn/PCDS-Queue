@@ -15,7 +15,7 @@ public static class ApiService
     {
         var address = Environment.GetEnvironmentVariable("PCDS_QUEUE_API_URL")?.Trim();
         if (string.IsNullOrWhiteSpace(address))
-            return "http://127.0.0.1:5000/";
+            return "https://pcds-queue-production.up.railway.app/";
 
         return address.EndsWith('/') ? address : $"{address}/";
     }

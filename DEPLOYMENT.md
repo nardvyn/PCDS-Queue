@@ -64,9 +64,10 @@ Before starting Staff, Admin, Kiosk, or TV Display on a client computer, set:
 $env:PCDS_QUEUE_API_URL = 'http://192.168.1.20:5000'
 ```
 
-If the variable is absent, each desktop app uses `http://127.0.0.1:5000` for a
-single-machine installation. The mobile app has its own Connection Settings
-screen where the same LAN address is saved.
+This override is for a campus LAN deployment. Without it, the desktop apps use
+the Railway HTTPS API at `https://pcds-queue-production.up.railway.app/`.
+The mobile app has its own Connection Settings screen where a LAN address can
+be saved.
 
 ## 4. Build Windows release folders
 
@@ -77,8 +78,26 @@ dotnet publish kiosk\PCDSQueue.Kiosk\PCDSQueue.Kiosk\PCDSQueue.Kiosk.csproj -c R
 dotnet publish tv-display\PCDSQueue.TVDisplay\PCDSQueue.TVDisplay.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o release\PCDSQueue.TVDisplay
 ```
 
-The release executables include the PCDS Queue application icon. Configure
-`PCDS_QUEUE_API_URL` on each client PC before launching the app.
+The release executables include the PCDS Queue application icon. Set
+`PCDS_QUEUE_API_URL` on each client PC only when overriding the Railway default.
+
+### Create desktop installers
+
+After publishing all four apps, install Inno Setup 6, open each `.iss` script
+below `installer`, and select **Build > Compile**.
+
+The setup files are written to `release\Installers`:
+`PCDS Queue Admin Setup.exe`, `PCDS Queue Staff Setup.exe`,
+`PCDS Queue Kiosk Setup.exe`, and `PCDS Queue TV Display Setup.exe`. Each setup
+installs its app under Program Files and creates a Start Menu shortcut; a
+desktop shortcut is optional in the installer. The package includes the
+self-contained app and its published runtime assets. The Staff installer also
+packages its WPF native runtime libraries beside the single-file executable;
+keep those DLLs with the app when copying a release folder manually.
+
+For an update release, increment `MyAppVersion` in the affected installer
+script and keep its existing `AppId` unchanged so Inno Setup upgrades the
+installed app. Rebuild only the desktop apps affected by the code changes.
 
 ## 5. Deploy the API to Railway
 
@@ -99,6 +118,13 @@ fallback. `DATABASE_URL` is also accepted when `MYSQL_URL` is absent. Do not
 commit the local `backend/.env` file. This Railway command is separate from
 `python serve.py`, which is intended for the Windows server.
 
+Before deploying the call grace-period backend, back up the Railway database
+and apply `database/migrations/004_customer_call_grace_period.sql` in its MySQL
+console. It adds the acknowledgement timestamp column and inserts default
+settings without replacing values already configured by an administrator.
+Confirm the migration succeeds before pushing/deploying the backend; do not
+import `database/schema.sql` into an existing production database.
+
 ## 6. Build the Android APK
 
 ```powershell
@@ -106,9 +132,21 @@ cd mobile\PCDSQueueMobile
 npx eas-cli build --platform android --profile production
 ```
 
-EAS requires the project's Expo account credentials. Set `EXPO_PUBLIC_API_URL`
-to the HTTPS production server before the build, or enter the LAN address in
-the app after installation for campus testing.
+The mobile API defaults to
+`https://pcds-queue-production.up.railway.app`; set `EXPO_PUBLIC_API_URL` only
+to override it, for example with a campus LAN address. The production EAS
+profile is configured for internal Android APK distribution and automatically
+increments the Android build number. For an app update, increment `expo.version`
+in `app.json`, keep `android.package` unchanged, and use the existing EAS
+signing credentials so Android can install it over the existing app. Download
+the completed APK and save it as
+`release\PCDS Queue Mobile v<version>.apk`. Install it on Android devices for
+QR scanning, joining a queue, and live-status smoke tests.
+
+For the call grace-period release, deploy and verify the backend first, then
+rebuild only Staff and Mobile. Existing Admin, Kiosk, TV Display installers,
+and the currently deployed APK can remain installed until their replacements
+are ready.
 
 ## 7. Backup and launch checks
 

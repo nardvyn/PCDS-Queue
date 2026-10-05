@@ -934,7 +934,8 @@ export default function App() {
                 />
               )}
 
-              {ticket.status === 'CALLED' && (ticket.call_countdown_enabled || ticket.customer_acknowledgement_enabled) && (
+              {['CALLED', 'SERVING'].includes(ticket.status) &&
+                (ticket.call_countdown_enabled || ticket.customer_acknowledgement_enabled) && (
                 <View style={styles.callGraceCard}>
                   {ticket.call_countdown_enabled && <>
                     <Text style={styles.callGraceLabel}>TIME TO PROCEED</Text>

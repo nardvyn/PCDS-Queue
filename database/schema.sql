@@ -125,6 +125,7 @@ CREATE TABLE `queue_numbers` (
     `staff_id`             INT UNSIGNED NULL,
     `created_at`           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `called_at`            DATETIME     NULL,
+    `customer_acknowledged_at` DATETIME  NULL,
     `serving_at`           DATETIME     NULL,
     `completed_at`         DATETIME     NULL,
     `cancelled_at`         DATETIME     NULL,

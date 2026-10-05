@@ -1,3 +1,4 @@
+import hashlib
 from datetime import date, datetime
 
 from flask import Blueprint, jsonify, request
@@ -12,6 +13,33 @@ queue_bp = Blueprint(
     __name__,
     url_prefix="/api/queue"
 )
+
+
+def _get_call_grace_period():
+    value = db.session.execute(text("""
+        SELECT setting_value FROM system_settings
+        WHERE setting_key = 'call_grace_period_seconds' LIMIT 1
+    """)).scalar()
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 60
+
+
+def _get_queue_rule(key, default=True):
+    value = db.session.execute(text("""
+        SELECT setting_value FROM system_settings
+        WHERE setting_key = :key LIMIT 1
+    """), {"key": key}).scalar()
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"true", "1", "yes", "on"}
+
+
+def _grace_remaining_seconds(status, called_at, grace_period):
+    if status not in ("CALLED", "SERVING") or not called_at:
+        return 0
+    return max(0, grace_period - int((datetime.now() - called_at).total_seconds()))
 
 
 @queue_bp.route("/generate", methods=["GET", "POST"])
@@ -29,19 +57,38 @@ def generate_queue():
             "allowed_sources": ["MOBILE", "KIOSK"]
         }), 200
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
 
     department_id = data.get("department_id")
     requested_source = str(data.get("source", "MOBILE")).upper()
     source = "MOBILE" if requested_source == "MOBILE" else "KIOSK"
     device_identifier = data.get("device_identifier")
     notification_token = data.get("notification_token")
+    qr_token = data.get("qr_token")
 
-    if not department_id:
-        return jsonify({"message": "department_id is required."}), 400
+    if isinstance(department_id, bool) or not isinstance(department_id, int) or department_id <= 0:
+        return jsonify({"message": "A valid department_id is required."}), 400
 
     if requested_source not in ("MOBILE", "KIOSK", "TICKET"):
         return jsonify({"message": "source must be MOBILE or KIOSK."}), 400
+
+    if source == "MOBILE" and (
+        not isinstance(qr_token, str) or not qr_token.strip() or len(qr_token) > 200
+    ):
+        return jsonify({
+            "valid": False,
+            "reason": "INVALID",
+            "message": "A valid department QR code is required to join the mobile queue."
+        }), 400
+
+    if source == "MOBILE" and (
+        not isinstance(device_identifier, str)
+        or not device_identifier.strip()
+        or len(device_identifier) > 128
+    ):
+        return jsonify({"message": "A valid device_identifier is required for mobile queue entry."}), 400
 
     database_source = "MOBILE" if source == "MOBILE" else "TICKET"
 
@@ -56,6 +103,61 @@ def generate_queue():
             return jsonify({"message": "Department is currently inactive."}), 400
         if not department["queue_is_open"]:
             return jsonify({"message": "Queue is currently closed."}), 400
+
+        if source == "MOBILE":
+            token_hash = hashlib.sha256(qr_token.strip().encode("utf-8")).hexdigest()
+            qr_session = db.session.execute(
+                text("""
+                    SELECT qs.department_id, qs.status, qs.expires_at, d.is_active
+                    FROM qr_sessions qs
+                    JOIN departments d ON d.department_id = qs.department_id
+                    WHERE qs.token_hash = :token_hash
+                    LIMIT 1
+                    FOR UPDATE
+                """),
+                {"token_hash": token_hash}
+            ).mappings().first()
+
+            if not qr_session:
+                return jsonify({
+                    "valid": False,
+                    "reason": "INVALID",
+                    "message": "This QR code is not recognized by the PCDS Queue System."
+                }), 404
+
+            if qr_session["status"] == "EXPIRED" or (
+                qr_session["status"] == "ACTIVE"
+                and qr_session["expires_at"] <= datetime.now()
+            ):
+                if qr_session["status"] == "ACTIVE":
+                    db.session.execute(
+                        text("""
+                            UPDATE qr_sessions
+                            SET status = 'EXPIRED'
+                            WHERE token_hash = :token_hash AND status = 'ACTIVE'
+                        """),
+                        {"token_hash": token_hash}
+                    )
+                    db.session.commit()
+                return jsonify({
+                    "valid": False,
+                    "reason": "EXPIRED",
+                    "message": "This QR code has expired. Please scan the latest PCDS Queue QR code."
+                }), 410
+
+            if qr_session["status"] != "ACTIVE" or not qr_session["is_active"]:
+                return jsonify({
+                    "valid": False,
+                    "reason": "INACTIVE",
+                    "message": "This QR code is no longer active."
+                }), 410
+
+            if qr_session["department_id"] != department_id:
+                return jsonify({
+                    "valid": False,
+                    "reason": "DEPARTMENT_MISMATCH",
+                    "message": "This QR code does not belong to the requested department."
+                }), 403
 
         setting_rows = db.session.execute(
             text("""
@@ -463,7 +565,7 @@ def queue_dashboard():
 
         current = db.session.execute(
             text("""
-                SELECT queue_id, queue_number, status
+                SELECT queue_id, queue_number, status, called_at, customer_acknowledged_at
                 FROM queue_numbers
                 WHERE department_id = :department_id
                   AND window_id = :window_id
@@ -494,6 +596,12 @@ def queue_dashboard():
             {"department_id": shift["department_id"]}
         ).mappings().first()
 
+        grace_period = _get_call_grace_period()
+        lock_no_show = _get_queue_rule("lock_no_show_during_grace")
+        current_remaining = _grace_remaining_seconds(
+            current["status"], current["called_at"], grace_period
+        ) if current else 0
+
         return jsonify({
             "department": shift["department_name"],
             "window": {
@@ -505,7 +613,10 @@ def queue_dashboard():
                 {
                     "queue_id": current["queue_id"],
                     "queue_number": current["queue_number"],
-                    "status": current["status"]
+                    "status": current["status"],
+                    "grace_remaining_seconds": current_remaining,
+                    "can_no_show": not lock_no_show or current_remaining <= 0,
+                    "customer_acknowledged": current["customer_acknowledged_at"] is not None
                 }
                 if current else None
             ),
@@ -590,7 +701,7 @@ def customer_queue_status(queue_id):
         queue = db.session.execute(
             text("""
                 SELECT q.queue_id, q.department_id, q.sequence_number,
-                       q.queue_number, q.status, q.source, q.created_at, q.called_at,
+                       q.queue_number, q.status, q.source, q.created_at, q.called_at, q.customer_acknowledged_at,
                        d.department_name,
                        sw.window_number, sw.window_name
                 FROM queue_numbers q
@@ -663,25 +774,66 @@ def customer_queue_status(queue_id):
             {"department_id": queue["department_id"]}
         ).scalar()
 
+        grace_period = _get_call_grace_period()
+        countdown_enabled = _get_queue_rule("enable_call_countdown")
+        lock_no_show = _get_queue_rule("lock_no_show_during_grace")
+        acknowledgement_enabled = _get_queue_rule("allow_customer_acknowledgement")
+        show_people_ahead = _get_queue_rule("show_people_ahead")
+        show_estimated_wait = _get_queue_rule("show_estimated_wait_time", False)
+        remaining = _grace_remaining_seconds(queue["status"], queue["called_at"], grace_period)
+
         return jsonify({
             "queue_id": queue["queue_id"],
             "queue_number": queue["queue_number"],
             "department": queue["department_name"],
             "status": queue["status"],
-            "people_ahead": people_ahead,
-            "estimated_wait_minutes": estimated_wait_minutes,
+            "people_ahead": people_ahead if show_people_ahead else 0,
+            "estimated_wait_minutes": estimated_wait_minutes if show_estimated_wait else 0,
             "current_serving": current_serving,
             "window_number": queue["window_number"],
             "window_name": queue["window_name"],
-            "called_at": _isoformat(queue["called_at"])
+            "called_at": _isoformat(queue["called_at"]),
+            "grace_period_seconds": grace_period,
+            "grace_remaining_seconds": remaining,
+            "call_countdown_enabled": countdown_enabled,
+            "customer_acknowledgement_enabled": acknowledgement_enabled,
+            "can_no_show": queue["status"] in ("CALLED", "SERVING") and (not lock_no_show or remaining <= 0),
+            "customer_acknowledged": queue["customer_acknowledged_at"] is not None
         }), 200
 
     except Exception as error:
         return jsonify({"message": "Unable to retrieve queue.", "error": str(error)}), 500
 
 
+@queue_bp.route("/<int:queue_id>/acknowledge", methods=["POST"])
+def acknowledge_queue(queue_id):
+    if not _get_queue_rule("allow_customer_acknowledgement"):
+        return jsonify({"message": "Customer acknowledgement is disabled."}), 403
+    try:
+        queue = db.session.execute(text("""
+            SELECT queue_id, status FROM queue_numbers
+            WHERE queue_id = :queue_id LIMIT 1
+        """), {"queue_id": queue_id}).mappings().first()
+        if not queue:
+            return jsonify({"message": "Queue not found."}), 404
+        if queue["status"] not in ("CALLED", "SERVING"):
+            return jsonify({"message": "Queue is not currently being called."}), 400
+        db.session.execute(text("""
+            UPDATE queue_numbers
+            SET customer_acknowledged_at = COALESCE(customer_acknowledged_at, NOW())
+            WHERE queue_id = :queue_id
+        """), {"queue_id": queue_id})
+        db.session.commit()
+        return jsonify({"message": "Acknowledged.", "customer_acknowledged": True}), 200
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"message": "Unable to acknowledge queue.", "error": str(error)}), 500
+
+
 @queue_bp.route("/<int:queue_id>/cancel", methods=["POST"])
 def cancel_customer_queue(queue_id):
+    if not _get_queue_rule("allow_mobile_cancellation"):
+        return jsonify({"message": "Mobile queue cancellation is disabled."}), 403
     data = request.get_json(silent=True)
     device_identifier = data.get("device_identifier") if isinstance(data, dict) else None
     if not isinstance(device_identifier, str) or not device_identifier.strip():
@@ -831,8 +983,8 @@ def next_number():
         db.session.execute(
             text("""
                 UPDATE queue_numbers
-                SET status = 'SERVING', window_id = :window_id, staff_id = :staff_id,
-                    called_at = :called_at, serving_at = :serving_at
+                SET status = 'CALLED', window_id = :window_id, staff_id = :staff_id,
+                    called_at = :called_at, serving_at = NULL, customer_acknowledged_at = NULL
                 WHERE queue_id = :queue_id
             """),
             {
@@ -856,7 +1008,7 @@ def next_number():
             "queue": {
                 "queue_id": queue["queue_id"],
                 "queue_number": queue["queue_number"],
-                "status": "SERVING",
+                "status": "CALLED",
                 "department": window["department_name"],
                 "window_id": window["window_id"],
                 "window_number": window["window_number"],
@@ -891,6 +1043,19 @@ def no_show_queue_help(queue_id):
 @queue_bp.route("/<int:queue_id>/no-show", methods=["POST"])
 @jwt_required()
 def no_show_queue(queue_id):
+    queue = _get_active_queue(queue_id, lock=True)
+    if not queue:
+        return jsonify({"message": "Queue not found."}), 404
+    grace_period = _get_call_grace_period()
+    lock_no_show = _get_queue_rule("lock_no_show_during_grace")
+    remaining = _grace_remaining_seconds(queue["status"], queue["called_at"], grace_period)
+    if lock_no_show and queue["status"] in ("CALLED", "SERVING") and remaining > 0:
+        db.session.rollback()
+        return jsonify({
+            "message": "Customer grace period is still active.",
+            "remaining_seconds": remaining
+        }), 409
+    db.session.rollback()
     return _finish_active_queue(
         queue_id, "NO_SHOW", "NO_SHOW",
         "Customer marked as no-show.", "Queue marked as no-show."
@@ -1053,7 +1218,7 @@ def _get_active_queue(queue_id, lock=False):
     lock_clause = " FOR UPDATE" if lock else ""
     return db.session.execute(
         text(
-            "SELECT queue_id, queue_number, window_id, staff_id, status "
+            "SELECT queue_id, queue_number, window_id, staff_id, status, called_at "
             "FROM queue_numbers WHERE queue_id = :queue_id" + lock_clause
         ),
         {"queue_id": queue_id}

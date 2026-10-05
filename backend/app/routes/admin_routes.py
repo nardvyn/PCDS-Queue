@@ -13,8 +13,24 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/api/admin")
 
 SYSTEM_SETTING_DEFAULTS = {
     "queue_digits": 3,
+    "call_grace_period_seconds": 60,
+    "enable_call_countdown": True,
+    "lock_no_show_during_grace": True,
+    "allow_customer_acknowledgement": True,
     "qr_expiration_hours": 24,
     "tv_voice_enabled": True,
+    "mobile_call_alert": True,
+    "mobile_recall_alert": True,
+    "mobile_voice_announcement": True,
+    "require_join_confirmation": True,
+    "allow_mobile_cancellation": True,
+    "show_people_ahead": True,
+    "show_estimated_wait_time": False,
+    "keep_alert_until_acknowledged": False,
+    "mobile_alert_duration_seconds": 15,
+    "show_connection_warning": True,
+    "automatic_reconnection": True,
+    "offline_retry_interval_seconds": 5,
     "refresh_interval": 3,
     "mobile_queue_enabled": True,
     "kiosk_queue_enabled": True
@@ -22,8 +38,24 @@ SYSTEM_SETTING_DEFAULTS = {
 
 SYSTEM_SETTING_DESCRIPTIONS = {
     "queue_digits": "Number of digits used to pad queue numbers",
+    "call_grace_period_seconds": "Seconds a called customer has before the grace period expires",
+    "enable_call_countdown": "Show the call grace-period countdown to customers",
+    "lock_no_show_during_grace": "Prevent staff from marking a called customer as no-show during the grace period",
+    "allow_customer_acknowledgement": "Allow customers to acknowledge that they are on the way",
     "qr_expiration_hours": "QR session lifetime in hours",
     "tv_voice_enabled": "Enable voice announcements on the TV display",
+    "mobile_call_alert": "Enable mobile call alerts",
+    "mobile_recall_alert": "Enable mobile recall alerts",
+    "mobile_voice_announcement": "Speak the queue call in the mobile app",
+    "require_join_confirmation": "Require the customer to confirm before joining a queue",
+    "allow_mobile_cancellation": "Allow customers to cancel while waiting",
+    "show_people_ahead": "Show waiting customers ahead in the mobile app",
+    "show_estimated_wait_time": "Show estimated wait time in the mobile app",
+    "keep_alert_until_acknowledged": "Keep mobile alerts active until acknowledged",
+    "mobile_alert_duration_seconds": "Mobile alert duration in seconds",
+    "show_connection_warning": "Show mobile connection warnings",
+    "automatic_reconnection": "Retry the mobile connection automatically",
+    "offline_retry_interval_seconds": "Seconds between offline retry attempts",
     "refresh_interval": "TV display refresh interval in seconds",
     "mobile_queue_enabled": "Allow queue entry from the mobile app",
     "kiosk_queue_enabled": "Allow queue entry from the kiosk"
@@ -1336,6 +1368,15 @@ def _read_system_settings():
         refresh_interval = int(stored.get("refresh_interval", 3))
     except (TypeError, ValueError):
         refresh_interval = 3
+    try:
+        call_grace_period_seconds = int(stored.get("call_grace_period_seconds", 60))
+    except (TypeError, ValueError):
+        call_grace_period_seconds = 60
+    def read_int(key, default, minimum, maximum):
+        try:
+            return min(maximum, max(minimum, int(stored.get(key, default))))
+        except (TypeError, ValueError):
+            return default
 
     def read_bool(key, default):
         value = stored.get(key)
@@ -1345,8 +1386,24 @@ def _read_system_settings():
 
     return {
         "queue_digits": min(6, max(2, queue_digits)),
+        "call_grace_period_seconds": min(300, max(10, call_grace_period_seconds)),
+        "enable_call_countdown": read_bool("enable_call_countdown", True),
+        "lock_no_show_during_grace": read_bool("lock_no_show_during_grace", True),
+        "allow_customer_acknowledgement": read_bool("allow_customer_acknowledgement", True),
         "qr_expiration_hours": min(168, max(1, qr_expiration_hours)),
         "tv_voice_enabled": read_bool("tv_voice_enabled", True),
+        "mobile_call_alert": read_bool("mobile_call_alert", True),
+        "mobile_recall_alert": read_bool("mobile_recall_alert", True),
+        "mobile_voice_announcement": read_bool("mobile_voice_announcement", True),
+        "require_join_confirmation": read_bool("require_join_confirmation", True),
+        "allow_mobile_cancellation": read_bool("allow_mobile_cancellation", True),
+        "show_people_ahead": read_bool("show_people_ahead", True),
+        "show_estimated_wait_time": read_bool("show_estimated_wait_time", False),
+        "keep_alert_until_acknowledged": read_bool("keep_alert_until_acknowledged", False),
+        "mobile_alert_duration_seconds": read_int("mobile_alert_duration_seconds", 15, 1, 120),
+        "show_connection_warning": read_bool("show_connection_warning", True),
+        "automatic_reconnection": read_bool("automatic_reconnection", True),
+        "offline_retry_interval_seconds": read_int("offline_retry_interval_seconds", 5, 1, 60),
         "refresh_interval": min(60, max(1, refresh_interval)),
         "mobile_queue_enabled": read_bool("mobile_queue_enabled", True),
         "kiosk_queue_enabled": read_bool("kiosk_queue_enabled", True)
@@ -1401,11 +1458,24 @@ def update_admin_settings():
 
     if isinstance(values["queue_digits"], bool) or not isinstance(values["queue_digits"], int) or not 2 <= values["queue_digits"] <= 6:
         return jsonify({"message": "queue_digits must be an integer from 2 to 6."}), 400
+    if isinstance(values["call_grace_period_seconds"], bool) or not isinstance(values["call_grace_period_seconds"], int) or not 10 <= values["call_grace_period_seconds"] <= 300:
+        return jsonify({"message": "call_grace_period_seconds must be an integer from 10 to 300."}), 400
+    if isinstance(values["mobile_alert_duration_seconds"], bool) or not isinstance(values["mobile_alert_duration_seconds"], int) or not 1 <= values["mobile_alert_duration_seconds"] <= 120:
+        return jsonify({"message": "mobile_alert_duration_seconds must be an integer from 1 to 120."}), 400
+    if isinstance(values["offline_retry_interval_seconds"], bool) or not isinstance(values["offline_retry_interval_seconds"], int) or not 1 <= values["offline_retry_interval_seconds"] <= 60:
+        return jsonify({"message": "offline_retry_interval_seconds must be an integer from 1 to 60."}), 400
     if isinstance(values["qr_expiration_hours"], bool) or not isinstance(values["qr_expiration_hours"], int) or not 1 <= values["qr_expiration_hours"] <= 168:
         return jsonify({"message": "qr_expiration_hours must be an integer from 1 to 168."}), 400
     if isinstance(values["refresh_interval"], bool) or not isinstance(values["refresh_interval"], int) or not 1 <= values["refresh_interval"] <= 60:
         return jsonify({"message": "refresh_interval must be an integer from 1 to 60."}), 400
-    for key in ("tv_voice_enabled", "mobile_queue_enabled", "kiosk_queue_enabled"):
+    for key in (
+        "enable_call_countdown", "lock_no_show_during_grace",
+        "allow_customer_acknowledgement", "tv_voice_enabled", "mobile_call_alert",
+        "mobile_recall_alert", "mobile_voice_announcement", "require_join_confirmation",
+        "allow_mobile_cancellation", "show_people_ahead", "show_estimated_wait_time",
+        "keep_alert_until_acknowledged", "show_connection_warning", "automatic_reconnection",
+        "mobile_queue_enabled", "kiosk_queue_enabled"
+    ):
         if not isinstance(values[key], bool):
             return jsonify({"message": f"{key} must be true or false."}), 400
 
@@ -1413,26 +1483,68 @@ def update_admin_settings():
         for key, value in values.items():
             db.session.execute(
                 text("""
-                    INSERT INTO system_settings (setting_key, setting_value, description, updated_by)
-                    VALUES (:setting_key, :setting_value, :description, :updated_by)
+                    INSERT INTO system_settings (setting_key, setting_value)
+                    VALUES (:setting_key, :setting_value)
                     ON DUPLICATE KEY UPDATE
-                        setting_value = VALUES(setting_value),
-                        description = VALUES(description),
-                        updated_by = VALUES(updated_by)
+                        setting_value = VALUES(setting_value)
                 """),
                 {
                     "setting_key": key,
-                    "setting_value": str(value).lower() if isinstance(value, bool) else str(value),
-                    "description": SYSTEM_SETTING_DESCRIPTIONS[key],
-                    "updated_by": admin_id
+                    "setting_value": str(value).lower() if isinstance(value, bool) else str(value)
                 }
             )
         db.session.commit()
+        saved_settings = _read_system_settings()
         return jsonify({
             "message": "System settings saved.",
-            "settings": values,
+            "settings": saved_settings,
             "system_info": _system_information()
         }), 200
     except Exception:
         db.session.rollback()
         return jsonify({"message": "Unable to save system settings."}), 500
+
+
+@admin_bp.route("/queue/reset-today", methods=["POST"])
+@jwt_required()
+def reset_today_queue_numbers():
+    admin_id, error = _admin_id_or_response()
+    if error:
+        return error
+
+    try:
+        active_count = db.session.execute(text("""
+            SELECT COUNT(*) FROM queue_numbers
+            WHERE queue_date = CURDATE()
+              AND status IN ('WAITING', 'CALLED', 'SERVING')
+            FOR UPDATE
+        """)).scalar()
+        if active_count:
+            db.session.rollback()
+            return jsonify({
+                "message": "Queue numbers cannot be reset while there are active queues. Complete, cancel, or mark them no-show first."
+            }), 409
+
+        deleted = db.session.execute(text("""
+            DELETE FROM queue_numbers
+            WHERE queue_date = CURDATE()
+        """)).rowcount
+        db.session.execute(text("""
+            DELETE FROM queue_counters
+            WHERE queue_date = CURDATE()
+        """))
+        db.session.execute(text("""
+            INSERT INTO audit_logs (staff_id, action, entity_type, description)
+            VALUES (:staff_id, 'RESET_QUEUE_NUMBERS', 'QUEUE', :description)
+        """), {
+            "staff_id": admin_id,
+            "description": f"Reset today's queue numbering and removed {deleted} terminal queue record(s)."
+        })
+        db.session.commit()
+        return jsonify({
+            "message": "Today's queue numbers have been reset.",
+            "deleted_queues": deleted
+        }), 200
+    except Exception:
+        db.session.rollback()
+        return jsonify({"message": "Unable to reset today's queue numbers."}), 500

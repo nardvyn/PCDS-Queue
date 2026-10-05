@@ -147,6 +147,20 @@ export async function acknowledgeQueue(queueId: number): Promise<{ customer_ackn
   return request(`api/queue/${queueId}/acknowledge`, { method: 'POST' });
 }
 
+export async function registerQueuePushToken(
+  queueId: number,
+  deviceIdentifier: string,
+  pushToken: string,
+): Promise<void> {
+  await request(`api/queue/${queueId}/push-token`, {
+    method: 'POST',
+    body: JSON.stringify({
+      device_identifier: deviceIdentifier,
+      push_token: pushToken,
+    }),
+  });
+}
+
 export async function getQueueAnnouncementEvents(
   queueId: number,
   deviceIdentifier: string,

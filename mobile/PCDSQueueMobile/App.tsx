@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import * as Crypto from 'expo-crypto';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
@@ -25,6 +26,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { getQueuePushToken } from './services/notifications';
 import {
   acknowledgeQueue,
   ApiError,
@@ -40,6 +42,7 @@ import {
   QueueStatus,
   QueueTicket,
   getApiUrl,
+  registerQueuePushToken,
   validateQrToken,
   ValidatedQr,
 } from './services/api';
@@ -184,12 +187,37 @@ export default function App() {
     queueId: null,
     eventId: null,
   });
+  const pushTokenQueueId = useRef<number | null>(null);
+  const handledNotificationResponse = useRef<string | null>(null);
   const colors = preferences.darkMode ? darkColors : lightColors;
   const styles = useMemo(() => createStyles(colors), [colors]);
   const appTheme = useMemo(() => ({ colors, styles }), [colors, styles]);
   const announcementPlayer = useAudioPlayer(require('./assets/notification.wav'));
   const activeQueueId = ticket?.queue_id;
   const activeQueueStatus = ticket?.status;
+
+  const openQueueFromNotification = useCallback(async (
+    response: Notifications.NotificationResponse,
+  ) => {
+    const responseId = response.notification.request.identifier;
+    const queueId = Number(response.notification.request.content.data?.queue_id);
+    if (!Number.isSafeInteger(queueId) || queueId <= 0 || ticket?.queue_id !== queueId) {
+      return;
+    }
+    if (handledNotificationResponse.current === responseId) return;
+    handledNotificationResponse.current = responseId;
+
+    setScreen('ticket');
+    try {
+      const status = await getQueueStatus(queueId);
+      setTicket((current) => current?.queue_id === queueId
+        ? { ...current, ...withoutStatusDepartment(status), deviceIdentifier }
+        : current);
+    } catch {
+      setConnectionType('SERVER_OFFLINE');
+      setShowConnectionModal(true);
+    }
+  }, [deviceIdentifier, ticket?.queue_id]);
 
   const checkConnection = useCallback(async () => {
     const network = await NetInfo.fetch();
@@ -295,6 +323,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      void openQueueFromNotification(response);
+    });
+
+    void Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (response) void openQueueFromNotification(response);
+      })
+      .catch((error: unknown) => {
+        console.warn('Could not read the notification that opened the app.', error);
+      });
+
+    return () => subscription.remove();
+  }, [openQueueFromNotification]);
+
+  useEffect(() => {
     if (!ticket) {
       void AsyncStorage.removeItem(ACTIVE_TICKET_STORAGE_KEY);
       return;
@@ -318,6 +362,29 @@ export default function App() {
   useEffect(() => {
     preferencesRef.current = preferences;
   }, [preferences]);
+
+  useEffect(() => {
+    if (!activeQueueId || !deviceIdentifier ||
+        !['WAITING', 'CALLED', 'SERVING'].includes(activeQueueStatus ?? '') ||
+        pushTokenQueueId.current === activeQueueId) {
+      return;
+    }
+
+    let mounted = true;
+    pushTokenQueueId.current = activeQueueId;
+    void getQueuePushToken()
+      .then(async (pushToken) => {
+        if (!mounted || !pushToken) return;
+        await registerQueuePushToken(activeQueueId, deviceIdentifier, pushToken);
+      })
+      .catch((error: unknown) => {
+        console.warn('Could not register background queue notifications.', error);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [activeQueueId, activeQueueStatus, deviceIdentifier]);
 
   useEffect(() => {
     if (!preferences.autoRefresh || !activeQueueId || !deviceIdentifier || !activeQueueStatus ||
@@ -550,12 +617,21 @@ export default function App() {
     setIsBusy(true);
     setErrorMessage('');
     setHasExistingQueueConflict(false);
+    let pushToken: string | null = null;
     try {
+      try {
+        pushToken = await getQueuePushToken();
+      } catch (error) {
+        console.warn('Background notifications could not be prepared; queue entry will continue.', error);
+      }
+
       const generated = await generateMobileQueue(
         qr.department.department_id,
         deviceIdentifier,
         qr.token,
+        pushToken ?? undefined,
       );
+      pushTokenQueueId.current = generated.queue_id;
       const status = await getQueueStatus(generated.queue_id);
       const activeTicket: ActiveTicket = {
         ...generated,
@@ -568,6 +644,12 @@ export default function App() {
       setScreen('ticket');
       setValidatedQr(null);
       setDepartmentStatus(null);
+      if (!pushToken) {
+        Alert.alert(
+          'Background alerts unavailable',
+          'Your queue ticket is active, but call alerts may only appear while this app is open. Allow PCDS Queue notifications in Android settings to receive background alerts.',
+        );
+      }
       return true;
     } catch (error) {
       const apiError = error instanceof ApiError ? error : null;
@@ -575,6 +657,18 @@ export default function App() {
       if (apiError?.statusCode === 409 && existingQueue?.queue_id) {
         setHasExistingQueueConflict(true);
         try {
+          let pushTokenRegistered = false;
+          if (pushToken) {
+            try {
+              await registerQueuePushToken(existingQueue.queue_id, deviceIdentifier, pushToken);
+              pushTokenRegistered = true;
+            } catch (registrationError) {
+              console.warn('Could not register background alerts for the active ticket.', registrationError);
+            }
+          }
+          pushTokenQueueId.current = pushToken && !pushTokenRegistered
+            ? null
+            : existingQueue.queue_id;
           const status = await getQueueStatus(existingQueue.queue_id);
           const resumed: ActiveTicket = {
             ...withoutStatusDepartment(status),
@@ -592,6 +686,12 @@ export default function App() {
           setValidatedQr(null);
           setDepartmentStatus(null);
           setHasExistingQueueConflict(false);
+          if (!pushToken) {
+            Alert.alert(
+              'Background alerts unavailable',
+              'Your queue ticket is active, but call alerts may only appear while this app is open. Allow PCDS Queue notifications in Android settings to receive background alerts.',
+            );
+          }
           return true;
         } catch {
           // Show the original conflict if the active ticket cannot be resumed.

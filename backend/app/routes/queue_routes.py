@@ -1,12 +1,14 @@
 import hashlib
+import re
 from datetime import date, datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app import db
+from app.services.push_service import send_queue_push
 
 queue_bp = Blueprint(
     "queue",
@@ -42,6 +44,75 @@ def _grace_remaining_seconds(status, called_at, grace_period):
     return max(0, grace_period - int((datetime.now() - called_at).total_seconds()))
 
 
+def _is_expo_push_token(value):
+    return isinstance(value, str) and len(value) <= 255 and re.fullmatch(
+        r"(?:Exponent|Expo)PushToken\[[A-Za-z0-9_-]+\]",
+        value.strip()
+    ) is not None
+
+
+def _send_queue_push_notification(queue_id, event_type):
+    setting_key = "mobile_recall_alert" if event_type == "RECALLED" else "mobile_call_alert"
+    try:
+        if not _get_queue_rule(setting_key):
+            return
+
+        queue = db.session.execute(text("""
+            SELECT q.queue_number, q.notification_token,
+                   d.department_name, sw.window_number, sw.window_name
+            FROM queue_numbers q
+            JOIN departments d ON d.department_id = q.department_id
+            LEFT JOIN service_windows sw ON sw.window_id = q.window_id
+            WHERE q.queue_id = :queue_id
+              AND q.source = 'MOBILE'
+              AND q.status IN ('CALLED', 'SERVING')
+            LIMIT 1
+        """), {"queue_id": queue_id}).mappings().first()
+        if not queue or not queue["notification_token"]:
+            return
+
+        queue_number = queue["queue_number"]
+        department = queue["department_name"]
+        window = queue["window_number"]
+        location = f"Window {window:02d}" if window is not None else queue["window_name"]
+        if event_type == "RECALLED":
+            title = "QUEUE RECALL"
+            body = f"{queue_number} - Please proceed to {department}, {location or 'the service window'}."
+        else:
+            title = "YOUR NUMBER IS CALLED"
+            body = f"{queue_number} - {department}, {location or 'service window'}. Please proceed."
+
+        result = send_queue_push(
+            queue["notification_token"],
+            title=title,
+            body=body,
+            data={"queue_id": queue_id, "event_type": event_type},
+        )
+        if result.get("status") != "ok":
+            details = result.get("details")
+            if isinstance(details, dict) and details.get("error") == "DeviceNotRegistered":
+                db.session.execute(text("""
+                    UPDATE queue_numbers
+                    SET notification_token = NULL
+                    WHERE queue_id = :queue_id
+                """), {"queue_id": queue_id})
+                db.session.commit()
+                current_app.logger.info(
+                    "Disabled an expired push token for queue %s.", queue_id
+                )
+            else:
+                current_app.logger.warning(
+                    "Expo rejected a queue notification for queue %s: %s",
+                    queue_id,
+                    result.get("message", "unknown error"),
+                )
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            "Could not send a push notification for queue %s.", queue_id
+        )
+
+
 @queue_bp.route("/generate", methods=["GET", "POST"])
 def generate_queue():
     if request.method == "GET":
@@ -73,6 +144,13 @@ def generate_queue():
 
     if requested_source not in ("MOBILE", "KIOSK", "TICKET"):
         return jsonify({"message": "source must be MOBILE or KIOSK."}), 400
+
+    if notification_token is not None and (
+        source != "MOBILE" or not _is_expo_push_token(notification_token)
+    ):
+        return jsonify({"message": "notification_token must be a valid Expo push token for a mobile queue."}), 400
+    if notification_token is not None:
+        notification_token = notification_token.strip()
 
     if source == "MOBILE" and (
         not isinstance(qr_token, str) or not qr_token.strip() or len(qr_token) > 200
@@ -202,6 +280,19 @@ def generate_queue():
             ).mappings().first()
 
             if existing:
+                if notification_token:
+                    db.session.execute(
+                        text("""
+                            UPDATE queue_numbers
+                            SET notification_token = :notification_token
+                            WHERE queue_id = :queue_id
+                        """),
+                        {
+                            "notification_token": notification_token,
+                            "queue_id": existing["queue_id"]
+                        }
+                    )
+                    db.session.commit()
                 return jsonify({
                     "message": "Device already has an active queue.",
                     "queue": {
@@ -863,7 +954,8 @@ def cancel_customer_queue(queue_id):
         db.session.execute(
             text("""
                 UPDATE queue_numbers
-                SET status = 'CANCELLED', cancelled_at = :cancelled_at
+                SET status = 'CANCELLED', cancelled_at = :cancelled_at,
+                    notification_token = NULL
                 WHERE queue_id = :queue_id
             """),
             {"cancelled_at": datetime.now(), "queue_id": queue_id}
@@ -880,6 +972,49 @@ def cancel_customer_queue(queue_id):
     except Exception as error:
         db.session.rollback()
         return jsonify({"message": "Unable to cancel queue.", "error": str(error)}), 500
+
+
+@queue_bp.route("/<int:queue_id>/push-token", methods=["POST"])
+def register_queue_push_token(queue_id):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"message": "A JSON object is required."}), 400
+
+    device_identifier = data.get("device_identifier")
+    push_token = data.get("push_token")
+    if not isinstance(device_identifier, str) or not device_identifier.strip() or len(device_identifier) > 128:
+        return jsonify({"message": "A valid device_identifier is required."}), 400
+    if not _is_expo_push_token(push_token):
+        return jsonify({"message": "A valid Expo push token is required."}), 400
+
+    try:
+        queue = db.session.execute(text("""
+            SELECT source, status, device_identifier
+            FROM queue_numbers
+            WHERE queue_id = :queue_id
+            LIMIT 1
+            FOR UPDATE
+        """), {"queue_id": queue_id}).mappings().first()
+        if not queue:
+            return jsonify({"message": "Queue not found."}), 404
+        if queue["source"] != "MOBILE" or queue["device_identifier"] != device_identifier.strip():
+            db.session.rollback()
+            return jsonify({"message": "This queue does not belong to this device."}), 403
+        if queue["status"] not in ("WAITING", "CALLED", "SERVING"):
+            db.session.rollback()
+            return jsonify({"message": "Push notifications are only available for an active queue."}), 409
+
+        db.session.execute(text("""
+            UPDATE queue_numbers
+            SET notification_token = :push_token
+            WHERE queue_id = :queue_id
+        """), {"push_token": push_token.strip(), "queue_id": queue_id})
+        db.session.commit()
+        return jsonify({"message": "Queue push token registered."}), 200
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Could not register push notifications for queue %s.", queue_id)
+        return jsonify({"message": "Unable to register push notifications."}), 500
 
 
 @queue_bp.route("/next", methods=["GET"])
@@ -1002,6 +1137,7 @@ def next_number():
                      description=f"Called {queue['queue_number']} at {window['window_name']}.")
 
         db.session.commit()
+        _send_queue_push_notification(queue["queue_id"], "CALLED")
 
         return jsonify({
             "message": "Next queue called.",
@@ -1088,6 +1224,7 @@ def recall_queue(queue_id):
                       notes="Queue number recalled.")
 
         db.session.commit()
+        _send_queue_push_notification(queue_id, "RECALLED")
 
         return jsonify({
             "message": "Queue recalled.",
@@ -1120,14 +1257,19 @@ def _finish_active_queue(queue_id, new_status, event_type, notes, success_messag
             db.session.execute(
                 text("""
                     UPDATE queue_numbers
-                    SET status = :status, completed_at = :completed_at
+                    SET status = :status, completed_at = :completed_at,
+                        notification_token = NULL
                     WHERE queue_id = :queue_id
                 """),
                 {"status": new_status, "completed_at": datetime.now(), "queue_id": queue_id}
             )
         else:
             db.session.execute(
-                text("UPDATE queue_numbers SET status = :status WHERE queue_id = :queue_id"),
+                text("""
+                    UPDATE queue_numbers
+                    SET status = :status, notification_token = NULL
+                    WHERE queue_id = :queue_id
+                """),
                 {"status": new_status, "queue_id": queue_id}
             )
 

@@ -143,6 +143,15 @@ the completed APK and save it as
 `release\PCDS Queue Mobile v<version>.apk`. Install it on Android devices for
 QR scanning, joining a queue, and live-status smoke tests.
 
+The mobile app requests Android notification permission when a customer joins
+the queue and stores the Expo push token on that active mobile ticket. Railway
+sends CALLED and RECALL alerts through Expo Push Service; this uses the existing
+`queue_numbers.notification_token` column and needs no additional database
+migration. Configure Android FCM v1 credentials for the EAS project before
+testing push delivery. Background delivery requires internet access and an
+Android device with notifications enabled; sound and vibration remain subject
+to the device's notification-channel and Do Not Disturb settings.
+
 For the call grace-period release, deploy and verify the backend first, then
 rebuild only Staff and Mobile. Existing Admin, Kiosk, TV Display installers,
 and the currently deployed APK can remain installed until their replacements

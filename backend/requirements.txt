@@ -4,3 +4,5 @@ PyMySQL
 python-dotenv
 Flask-JWT-Extended
 Flask-Cors
+waitress
+gunicorn; platform_system != "Windows"

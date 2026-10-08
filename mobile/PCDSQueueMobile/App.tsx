@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
+import { getPermissionsAsync } from 'expo-notifications/build/NotificationPermissions';
+import {
+  addNotificationResponseReceivedListener,
+  getLastNotificationResponseAsync,
+} from 'expo-notifications/build/NotificationsEmitter';
+import { setNotificationHandler } from 'expo-notifications/build/NotificationsHandler';
+import type { NotificationResponse } from 'expo-notifications/build/Notifications.types';
 import * as Crypto from 'expo-crypto';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
@@ -10,13 +16,16 @@ import NetInfo from '@react-native-community/netinfo';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
   ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   StatusBar,
@@ -26,14 +35,17 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { getQueuePushToken } from './services/notifications';
+import { getQueuePushToken, isExpoGo } from './services/notifications';
+import { clearActiveTicket, getActiveTicket, saveActiveTicket } from './services/ticketStorage';
 import {
   acknowledgeQueue,
   ApiError,
   cancelMobileQueue,
   checkApiHealth,
   DepartmentQueueStatus,
+  ActiveDepartment,
   generateMobileQueue,
+  getActiveDepartments,
   getDepartmentQueueStatus,
   getQueueAnnouncementEvents,
   getQueueStatus,
@@ -48,7 +60,6 @@ import {
 } from './services/api';
 
 const DEVICE_ID_STORAGE_KEY = 'pcds.deviceIdentifier';
-const ACTIVE_TICKET_STORAGE_KEY = 'pcds.activeMobileTicket';
 const MOBILE_PREFERENCES_STORAGE_KEY = 'pcds.mobilePreferences';
 const ANNOUNCEMENT_POLL_INTERVAL_MS = 2000;
 const KEEP_AWAKE_TAG = 'pcds-queue-waiting';
@@ -166,10 +177,14 @@ export default function App() {
   const [splashStatus, setSplashStatus] = useState('Connecting to queue server...');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [apiOnline, setApiOnline] = useState(false);
+  const [activeDepartments, setActiveDepartments] = useState<ActiveDepartment[]>([]);
+  const [isRefreshingServices, setIsRefreshingServices] = useState(false);
+  const [servicesError, setServicesError] = useState('');
   const [deviceIdentifier, setDeviceIdentifier] = useState('');
   const [validatedQr, setValidatedQr] = useState<ValidatedQr | null>(null);
   const [departmentStatus, setDepartmentStatus] = useState<DepartmentQueueStatus | null>(null);
   const [ticket, setTicket] = useState<ActiveTicket | null>(null);
+  const [ticketStorageReady, setTicketStorageReady] = useState(false);
   const [latestAnnouncement, setLatestAnnouncement] = useState<QueueAnnouncementEvent | null>(null);
   const [activeAlert, setActiveAlert] = useState<QueueAlertPresentation | null>(null);
   const [preferences, setPreferences] = useState<MobilePreferences>(DEFAULT_PREFERENCES);
@@ -183,6 +198,9 @@ export default function App() {
   const [connectionType, setConnectionType] = useState<ConnectionType>('CONNECTED');
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [connectionRestored, setConnectionRestored] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean | null>(null);
+  const [notificationsCanAskAgain, setNotificationsCanAskAgain] = useState(true);
+  const runningInExpoGo = isExpoGo();
   const announcementCursor = useRef<{ queueId: number | null; eventId: number | null }>({
     queueId: null,
     eventId: null,
@@ -196,8 +214,59 @@ export default function App() {
   const activeQueueId = ticket?.queue_id;
   const activeQueueStatus = ticket?.status;
 
+  const checkNotificationPermission = useCallback(async () => {
+    if (runningInExpoGo) {
+      setNotificationsEnabled(false);
+      setNotificationsCanAskAgain(false);
+      return;
+    }
+    try {
+      const permission = await getPermissionsAsync();
+      setNotificationsEnabled(permission.status === 'granted');
+      setNotificationsCanAskAgain(permission.canAskAgain);
+    } catch (error) {
+      console.warn('Could not check background notification permission.', error);
+      setNotificationsEnabled(false);
+      setNotificationsCanAskAgain(false);
+    }
+  }, [runningInExpoGo]);
+
+  const enableNotifications = useCallback(async () => {
+    try {
+      const token = await getQueuePushToken(true);
+      await checkNotificationPermission();
+      if (token && ticket && deviceIdentifier) {
+        await registerQueuePushToken(ticket.queue_id, deviceIdentifier, token);
+        pushTokenQueueId.current = ticket.queue_id;
+      }
+    } catch (error) {
+      console.warn('Could not enable background queue alerts.', error);
+      await checkNotificationPermission();
+    }
+  }, [checkNotificationPermission, deviceIdentifier, ticket]);
+
+  const openNotificationSettings = useCallback(async () => {
+    await Linking.openSettings();
+  }, []);
+
+  const refreshServices = useCallback(async () => {
+    setIsRefreshingServices(true);
+    try {
+      const departments = await getActiveDepartments();
+      setActiveDepartments(departments);
+      setServicesError('');
+    } catch (error) {
+      console.warn('Could not refresh active campus services.', error);
+      setServicesError(
+        error instanceof Error ? error.message : 'Unable to load campus services. Pull down to retry.',
+      );
+    } finally {
+      setIsRefreshingServices(false);
+    }
+  }, []);
+
   const openQueueFromNotification = useCallback(async (
-    response: Notifications.NotificationResponse,
+    response: NotificationResponse,
   ) => {
     const responseId = response.notification.request.identifier;
     const queueId = Number(response.notification.request.content.data?.queue_id);
@@ -257,6 +326,7 @@ export default function App() {
     let mounted = true;
 
     const initialize = async () => {
+      let restoredTicket: ActiveTicket | null = null;
       try {
         await initializeApiUrl();
         if (mounted) setServerAddress(getApiUrl().replace(/^https?:\/\//i, ''));
@@ -275,25 +345,54 @@ export default function App() {
           deviceId = Crypto.randomUUID();
           await AsyncStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
         }
+        if (mounted) setDeviceIdentifier(deviceId);
 
-        const savedTicket = await AsyncStorage.getItem(ACTIVE_TICKET_STORAGE_KEY);
+        const savedTicket = await getActiveTicket();
         if (mounted) {
-          setDeviceIdentifier(deviceId);
           if (savedTicket) {
-            const parsed = JSON.parse(savedTicket) as ActiveTicket;
-            setTicket(parsed);
+            if (isRestorableTicket(savedTicket)) {
+              restoredTicket = { ...savedTicket, deviceIdentifier: deviceId };
+              setTicket(restoredTicket);
+              setScreen('ticket');
+            } else {
+              console.warn('Saved queue ticket is invalid and cannot be restored.');
+              await clearActiveTicket();
+            }
           }
-        }
-
-        await checkApiHealth();
-        if (mounted) {
-          setApiOnline(true);
-          setSplashStatus('Queue server connected');
+          setTicketStorageReady(true);
         }
       } catch {
         if (mounted) {
+          console.warn('Could not restore mobile app data.');
           setApiOnline(false);
-          setSplashStatus('Starting PCDS Queue...');
+          setErrorMessage('Could not restore saved app data. Your queue ticket may not be available.');
+        }
+      }
+
+      try {
+        await checkApiHealth();
+        if (!mounted) return;
+        setApiOnline(true);
+        setConnectionType('CONNECTED');
+        setSplashStatus('Queue server connected');
+        if (restoredTicket) {
+          const status = await getQueueStatus(restoredTicket.queue_id);
+          if (!mounted) return;
+          const refreshedTicket: ActiveTicket = {
+            ...restoredTicket,
+            ...withoutStatusDepartment(status),
+            deviceIdentifier: restoredTicket.deviceIdentifier,
+          };
+          await saveActiveTicket(refreshedTicket);
+          setTicket(refreshedTicket);
+        }
+      } catch (error) {
+        if (mounted) {
+          console.warn('Could not refresh the saved queue ticket from the server.', error);
+          setApiOnline(false);
+          setConnectionType('SERVER_OFFLINE');
+          if (restoredTicket) setShowConnectionModal(true);
+          else setSplashStatus('Starting PCDS Queue...');
         }
       }
     };
@@ -318,16 +417,49 @@ export default function App() {
   }, [checkConnection]);
 
   useEffect(() => {
+    if (screen !== 'ticket' && screen !== 'settings') return;
+    const timer = setTimeout(() => void checkNotificationPermission(), 0);
+    return () => clearTimeout(timer);
+  }, [checkNotificationPermission, screen]);
+
+  useEffect(() => {
+    if (screen !== 'home' || !apiOnline) return;
+    const timer = setTimeout(() => void refreshServices(), 0);
+    return () => clearTimeout(timer);
+  }, [apiOnline, refreshServices, screen]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && (screen === 'ticket' || screen === 'settings')) {
+        void checkNotificationPermission();
+      }
+      if (state === 'active' && screen === 'home' && apiOnline) {
+        void refreshServices();
+      }
+    });
+    return () => subscription.remove();
+  }, [apiOnline, checkNotificationPermission, refreshServices, screen]);
+
+  useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2500);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    if (runningInExpoGo) return;
+
+    setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: false,
+        shouldShowList: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+    const subscription = addNotificationResponseReceivedListener((response) => {
       void openQueueFromNotification(response);
     });
-
-    void Notifications.getLastNotificationResponseAsync()
+    void getLastNotificationResponseAsync()
       .then((response) => {
         if (response) void openQueueFromNotification(response);
       })
@@ -335,15 +467,17 @@ export default function App() {
         console.warn('Could not read the notification that opened the app.', error);
       });
 
-    return () => subscription.remove();
-  }, [openQueueFromNotification]);
+    return () => {
+      subscription.remove();
+    };
+  }, [openQueueFromNotification, runningInExpoGo]);
 
   useEffect(() => {
-    if (!ticket) {
-      void AsyncStorage.removeItem(ACTIVE_TICKET_STORAGE_KEY);
-      return;
-    }
-    void AsyncStorage.setItem(ACTIVE_TICKET_STORAGE_KEY, JSON.stringify(ticket));
+    if (!ticket) return;
+    void saveActiveTicket(ticket).catch((error: unknown) => {
+      console.warn('Could not save the active queue ticket.', error);
+      setErrorMessage('Could not save your ticket on this device. Keep the app installed and open.');
+    });
   }, [ticket]);
 
   useEffect(() => {
@@ -610,6 +744,14 @@ export default function App() {
   }, [preferences.keepScreenAwake, ticket?.status]);
 
   const joinQueue = useCallback(async (qr: ValidatedQr): Promise<boolean> => {
+    if (!ticketStorageReady) {
+      setErrorMessage('Your saved ticket is still being restored. Please try again in a moment.');
+      return false;
+    }
+    if (ticket && ['WAITING', 'CALLED', 'SERVING'].includes(ticket.status)) {
+      setScreen('ticket');
+      return true;
+    }
     if (!deviceIdentifier) {
       setErrorMessage('Device setup is incomplete. Please restart the app and try again.');
       return false;
@@ -632,23 +774,47 @@ export default function App() {
         pushToken ?? undefined,
       );
       pushTokenQueueId.current = generated.queue_id;
-      const status = await getQueueStatus(generated.queue_id);
       const activeTicket: ActiveTicket = {
         ...generated,
-        ...withoutStatusDepartment(status),
+        estimated_wait_minutes: 0,
+        current_serving: null,
+        window_number: null,
+        window_name: null,
+        called_at: null,
+        grace_period_seconds: 0,
+        grace_remaining_seconds: 0,
+        call_countdown_enabled: false,
+        customer_acknowledgement_enabled: false,
+        can_no_show: false,
+        customer_acknowledged: false,
         deviceIdentifier,
       };
+      try {
+        await saveActiveTicket(activeTicket);
+      } catch (storageError) {
+        console.warn('Could not save the newly created queue ticket.', storageError);
+        setErrorMessage('Your ticket was created, but could not be saved on this device.');
+      }
       announcementCursor.current = { queueId: generated.queue_id, eventId: 0 };
       setTicket(activeTicket);
       setApiOnline(true);
       setScreen('ticket');
       setValidatedQr(null);
       setDepartmentStatus(null);
-      if (!pushToken) {
-        Alert.alert(
-          'Background alerts unavailable',
-          'Your queue ticket is active, but call alerts may only appear while this app is open. Allow PCDS Queue notifications in Android settings to receive background alerts.',
-        );
+      try {
+        const status = await getQueueStatus(generated.queue_id);
+        const refreshedTicket: ActiveTicket = {
+          ...activeTicket,
+          ...withoutStatusDepartment(status),
+          deviceIdentifier,
+        };
+        await saveActiveTicket(refreshedTicket);
+        setTicket(refreshedTicket);
+      } catch (statusError) {
+        console.warn('Could not refresh the newly created queue ticket.', statusError);
+        setApiOnline(false);
+        setConnectionType('SERVER_OFFLINE');
+        setShowConnectionModal(true);
       }
       return true;
     } catch (error) {
@@ -681,17 +847,17 @@ export default function App() {
             source: 'MOBILE',
             deviceIdentifier,
           };
+          try {
+            await saveActiveTicket(resumed);
+          } catch (storageError) {
+            console.warn('Could not save the resumed queue ticket.', storageError);
+            setErrorMessage('Your active ticket was restored, but could not be saved on this device.');
+          }
           setTicket(resumed);
           setScreen('ticket');
           setValidatedQr(null);
           setDepartmentStatus(null);
           setHasExistingQueueConflict(false);
-          if (!pushToken) {
-            Alert.alert(
-              'Background alerts unavailable',
-              'Your queue ticket is active, but call alerts may only appear while this app is open. Allow PCDS Queue notifications in Android settings to receive background alerts.',
-            );
-          }
           return true;
         } catch {
           // Show the original conflict if the active ticket cannot be resumed.
@@ -728,7 +894,7 @@ export default function App() {
     } finally {
       setIsBusy(false);
     }
-  }, [deviceIdentifier]);
+  }, [deviceIdentifier, ticket, ticketStorageReady]);
 
   const handleQrScanned = useCallback(async (token: string): Promise<boolean> => {
     setIsBusy(true);
@@ -782,6 +948,11 @@ export default function App() {
 
   const openScanner = async () => {
     setErrorMessage('');
+    if (!ticketStorageReady) return;
+    if (ticket && ['WAITING', 'CALLED', 'SERVING'].includes(ticket.status)) {
+      setScreen('ticket');
+      return;
+    }
     if (!cameraPermission?.granted) {
       const permission = await requestCameraPermission();
       if (!permission.granted) {
@@ -822,6 +993,21 @@ export default function App() {
     }
   };
 
+  const handleTicketDone = async () => {
+    setIsBusy(true);
+    setErrorMessage('');
+    try {
+      await clearActiveTicket();
+      setTicket(null);
+      setScreen('home');
+    } catch (error) {
+      console.warn('Could not clear the completed queue ticket.', error);
+      setErrorMessage('Could not clear the saved ticket. Please try again.');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   const handleOnMyWay = async () => {
     if (!ticket) return;
     setIsBusy(true);
@@ -851,29 +1037,48 @@ export default function App() {
     });
   };
 
+  const returnHomeFromScanner = useCallback(() => {
+    setScreen('home');
+    requestAnimationFrame(() => {
+      const backgroundColor = preferences.darkMode ? colors.background : colors.white;
+      StatusBar.setHidden(false, 'fade');
+      StatusBar.setBarStyle(preferences.darkMode ? 'light-content' : 'dark-content', true);
+      if (Platform.OS === 'android') {
+        StatusBar.setBackgroundColor(backgroundColor, true);
+      }
+    });
+  }, [colors.background, colors.white, preferences.darkMode]);
+
   const appContent = showSplash ? (
     <SplashScreen status={splashStatus} />
   ) : screen === 'scanner' ? (
     <QrScannerScreen
       cameraPermissionGranted={!!cameraPermission?.granted}
       onRequestCameraPermission={() => void openScanner()}
-      onBack={() => setScreen('home')}
+      onBack={returnHomeFromScanner}
       onBarcodeFound={handleQrScanned}
       errorMessage={errorMessage}
       isBusy={isBusy}
     />
   ) : (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar
-        barStyle={preferences.darkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={preferences.darkMode ? colors.background : colors.white}
-        translucent={false}
-      />
+
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={screen === 'home' ? (
+            <RefreshControl
+              refreshing={isRefreshingServices}
+              onRefresh={() => void refreshServices()}
+              tintColor={colors.green}
+              colors={[colors.green]}
+            />
+          ) : undefined}
+        >
           <View style={styles.header}>
             <View style={styles.brandRow}>
               <View style={styles.brandMark}>
@@ -899,6 +1104,11 @@ export default function App() {
               apiOnline={apiOnline}
               serverAddress={serverAddress}
               errorMessage={preferencesError}
+              notificationsEnabled={notificationsEnabled === true}
+              notificationsCanAskAgain={notificationsCanAskAgain}
+              runningInExpoGo={runningInExpoGo}
+              onEnableNotifications={enableNotifications}
+              onOpenNotificationSettings={openNotificationSettings}
             />
           )}
 
@@ -910,6 +1120,10 @@ export default function App() {
                 <Text style={styles.heroCopy}>Scan a campus service QR code to get your queue number without waiting in line.</Text>
               </View>
 
+              {!ticketStorageReady && !!errorMessage && (
+                <InlineNotice message={errorMessage} tone="error" />
+              )}
+
               {ticket && (
                 <ActiveTicketCard
                   ticket={ticket}
@@ -919,16 +1133,32 @@ export default function App() {
               )}
 
               <Pressable
-                style={[styles.scanButton, ticket && ['WAITING', 'CALLED', 'SERVING'].includes(ticket.status) && styles.disabledButton]}
+                style={[
+                  styles.scanButton,
+                  (!ticketStorageReady || (ticket && ['WAITING', 'CALLED', 'SERVING'].includes(ticket.status))) &&
+                    styles.disabledButton,
+                ]}
                 onPress={() => void openScanner()}
-                disabled={!!ticket && ['WAITING', 'CALLED', 'SERVING'].includes(ticket.status)}
+                disabled={!ticketStorageReady || (!!ticket && ['WAITING', 'CALLED', 'SERVING'].includes(ticket.status))}
               >
                 <View style={styles.scanIcon}>
                   <Feather name="maximize" size={22} color="white" />
                 </View>
                 <View style={styles.scanButtonText}>
-                  <Text style={styles.scanButtonTitle}>{ticket && ['WAITING', 'CALLED', 'SERVING'].includes(ticket.status) ? 'Ticket active' : 'SCAN DEPARTMENT QR'}</Text>
-                  <Text style={styles.scanButtonCaption}>{ticket && ['WAITING', 'CALLED', 'SERVING'].includes(ticket.status) ? 'Open your current queue ticket above' : 'Department is detected automatically'}</Text>
+                  <Text style={styles.scanButtonTitle}>
+                    {!ticketStorageReady
+                      ? 'Restoring ticket…'
+                      : ticket && ['WAITING', 'CALLED', 'SERVING'].includes(ticket.status)
+                        ? 'Ticket active'
+                        : 'SCAN DEPARTMENT QR'}
+                  </Text>
+                  <Text style={styles.scanButtonCaption}>
+                    {!ticketStorageReady
+                      ? 'Checking this device for a saved queue ticket'
+                      : ticket && ['WAITING', 'CALLED', 'SERVING'].includes(ticket.status)
+                        ? 'Open your current queue ticket above'
+                        : 'Department is detected automatically'}
+                  </Text>
                 </View>
                 <Feather name="arrow-up-right" size={20} color="white" />
               </Pressable>
@@ -936,7 +1166,20 @@ export default function App() {
               <View style={styles.serviceNote}>
                 <View style={styles.noteRule} />
                 <Text style={styles.noteLabel}>SERVICES</Text>
-                <Text style={styles.noteText}>Cashier · Registrar · Bookstore</Text>
+                <Text style={styles.noteText}>
+                  {activeDepartments.length > 0
+                    ? activeDepartments.map((department) => department.department_name).join(' · ')
+                    : isRefreshingServices
+                      ? 'Loading services…'
+                      : 'No active services available'}
+                </Text>
+                {!!servicesError && (
+                  <Text style={styles.serviceError}>
+                    {activeDepartments.length > 0
+                      ? 'Could not refresh services. Pull down to try again.'
+                      : 'Could not load services. Pull down to try again.'}
+                  </Text>
+                )}
               </View>
             </>
           )}
@@ -992,6 +1235,32 @@ export default function App() {
                 </View>
                 <StatusPill status={ticket.status} />
               </View>
+              {(runningInExpoGo || notificationsEnabled === false) && (
+                <View style={styles.notificationWarning}>
+                  <View style={styles.flex}>
+                    <Text style={styles.notificationWarningTitle}>
+                      {runningInExpoGo ? 'Background alerts need a development build' : 'Background alerts are off'}
+                    </Text>
+                    <Text style={styles.notificationWarningText}>
+                      {runningInExpoGo
+                        ? 'Android push notifications are not available in Expo Go. Use a development build to receive queue calls in the background.'
+                        : 'Enable notifications so you do not miss your queue call.'}
+                    </Text>
+                  </View>
+                  {!runningInExpoGo && (
+                    <Pressable
+                      style={styles.notificationEnableButton}
+                      onPress={() => void (notificationsCanAskAgain ? enableNotifications() : openNotificationSettings())}
+                      accessibilityRole="button"
+                      accessibilityLabel={notificationsCanAskAgain ? 'Enable queue notifications' : 'Open notification settings'}
+                    >
+                      <Text style={styles.notificationEnableButtonText}>
+                        {notificationsCanAskAgain ? 'ENABLE' : 'OPEN SETTINGS'}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
 
               {preferences.queueAlerts && latestAnnouncement?.queue_id === ticket.queue_id &&
                 ['CALLED', 'SERVING'].includes(ticket.status) && (
@@ -1088,7 +1357,11 @@ export default function App() {
                 </Pressable>
               )}
               {['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(ticket.status) && (
-                <ActionButton title="DONE" onPress={() => { setTicket(null); setScreen('home'); }} />
+                <ActionButton
+                  title={isBusy ? 'CLEARING…' : 'DONE'}
+                  onPress={() => void handleTicketDone()}
+                  disabled={isBusy}
+                />
               )}
             </View>
           )}
@@ -1131,6 +1404,13 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeContext.Provider value={appTheme}>
         <View style={styles.appRoot}>
+          <StatusBar
+            key={`${showSplash ? 'splash' : activeAlert ? 'alert' : screen}-${preferences.darkMode ? 'dark' : 'light'}`}
+            barStyle={showSplash || activeAlert || preferences.darkMode ? 'light-content' : 'dark-content'}
+            backgroundColor={showSplash ? '#077F8D' : activeAlert ? colors.primarySurface : preferences.darkMode ? colors.background : colors.white}
+            translucent={false}
+            hidden={false}
+          />
           {connectionRestored && (
             <View style={styles.connectionRestoredBanner}>
               <Text style={styles.connectionRestoredText}>CONNECTION RESTORED — queue status is up to date.</Text>
@@ -1156,7 +1436,6 @@ function SplashScreen({ status }: { status: string }) {
   const { styles } = useAppTheme();
   return (
     <SafeAreaView style={styles.splashSafeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#077F8D" translucent={false} />
       <View style={styles.splashContent}>
         <View style={styles.splashLogoShell}>
           <Image source={require('./assets/pcds-logo.png')} style={styles.splashLogo} resizeMode="contain" />
@@ -1231,7 +1510,6 @@ function QueueAlertOverlay({
 
   return (
     <SafeAreaView style={[styles.alertOverlay, StyleSheet.absoluteFill]} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primarySurface} translucent={false} />
       <View style={styles.alertContent} accessibilityLiveRegion="assertive">
         <View style={styles.alertIcon}>
           <Feather name={isTest ? 'volume-2' : 'bell'} size={28} color={colors.green} />
@@ -1298,7 +1576,6 @@ function QrScannerScreen({
 
   return (
     <View style={styles.scannerRoot}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primarySurface} translucent={false} />
       {cameraPermissionGranted ? (
         <CameraView
           style={StyleSheet.absoluteFill}
@@ -1314,7 +1591,7 @@ function QrScannerScreen({
           <ActionButton title="Allow camera" onPress={onRequestCameraPermission} />
         </View>
       )}
-      <View style={styles.scannerOverlay}>
+      <View style={styles.scannerOverlay} pointerEvents="box-none">
         <Pressable
           onPress={onBack}
           style={styles.scannerBack}
@@ -1352,6 +1629,11 @@ function SettingsScreen({
   apiOnline,
   serverAddress,
   errorMessage,
+  notificationsEnabled,
+  notificationsCanAskAgain,
+  runningInExpoGo,
+  onEnableNotifications,
+  onOpenNotificationSettings,
 }: {
   preferences: MobilePreferences;
   onChange: (updates: Partial<MobilePreferences>) => void;
@@ -1359,6 +1641,11 @@ function SettingsScreen({
   apiOnline: boolean;
   serverAddress: string;
   errorMessage: string;
+  notificationsEnabled: boolean;
+  notificationsCanAskAgain: boolean;
+  runningInExpoGo: boolean;
+  onEnableNotifications: () => void;
+  onOpenNotificationSettings: () => void;
 }) {
   const { colors, styles } = useAppTheme();
   return (
@@ -1450,6 +1737,36 @@ function SettingsScreen({
           <Feather name="play" size={16} color={colors.green} />
           <Text style={styles.testAlertButtonText}>TEST ALERT</Text>
         </Pressable>
+      </SettingsSection>
+
+      <SettingsSection title="Queue Alerts">
+        <View style={styles.backgroundAlertRow}>
+          <View style={styles.settingsIcon}>
+            <Feather name={notificationsEnabled && !runningInExpoGo ? 'check-circle' : 'alert-triangle'} size={17} color={notificationsEnabled && !runningInExpoGo ? colors.green : colors.amber} />
+          </View>
+          <View style={styles.settingsToggleCopy}>
+            <Text style={styles.settingsToggleTitle}>Background Alerts</Text>
+            <Text style={styles.settingsToggleDescription}>
+              {runningInExpoGo
+                ? 'Android push notifications require a development build'
+                : notificationsEnabled
+                ? 'Allowed by Android'
+                : 'Permission required so you do not miss your queue call'}
+            </Text>
+          </View>
+          {!runningInExpoGo && !notificationsEnabled && (
+            <Pressable
+              style={styles.backgroundAlertAction}
+              onPress={notificationsCanAskAgain ? onEnableNotifications : onOpenNotificationSettings}
+              accessibilityRole="button"
+              accessibilityLabel={notificationsCanAskAgain ? 'Enable background alerts' : 'Open Android notification settings'}
+            >
+              <Text style={styles.backgroundAlertActionText}>
+                {notificationsCanAskAgain ? 'ENABLE' : 'OPEN SETTINGS'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
       </SettingsSection>
 
       <SettingsSection title="Voice">
@@ -1709,6 +2026,26 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
 }
 
+function isRestorableTicket(
+  value: unknown,
+): value is Omit<ActiveTicket, 'deviceIdentifier'> & Partial<Pick<ActiveTicket, 'deviceIdentifier'>> {
+  if (!value || typeof value !== 'object') return false;
+  const saved = value as Record<string, unknown>;
+  const department = saved.department;
+  if (!department || typeof department !== 'object') return false;
+  const savedDepartment = department as Record<string, unknown>;
+  return Number.isSafeInteger(saved.queue_id) &&
+    (saved.queue_id as number) > 0 &&
+    typeof saved.queue_number === 'string' &&
+    typeof saved.sequence_number === 'number' &&
+    typeof saved.source === 'string' &&
+    typeof saved.status === 'string' &&
+    typeof saved.people_ahead === 'number' &&
+    typeof savedDepartment.department_id === 'number' &&
+    typeof savedDepartment.department_name === 'string' &&
+    typeof savedDepartment.queue_prefix === 'string';
+}
+
 function withoutStatusDepartment(status: QueueStatus): Omit<QueueStatus, 'department'> {
   const { department: _departmentName, ...statusFields } = status;
   return statusFields;
@@ -1809,6 +2146,7 @@ function createStyles(colors: ThemeColors) {
   noteRule: { height: 1, backgroundColor: colors.line, marginBottom: 17 },
   noteLabel: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1 },
   noteText: { color: colors.ink, fontSize: 14, fontWeight: '600', marginTop: 8 },
+  serviceError: { color: colors.red, fontSize: 12, lineHeight: 17, marginTop: 6 },
   footer: { marginTop: 'auto', paddingTop: 38, alignItems: 'center' },
   footerText: { color: colors.faint, fontSize: 8, fontWeight: '800', letterSpacing: 0.7 },
   footerSubtext: { color: colors.faint, fontSize: 8, marginTop: 5 },
@@ -1882,6 +2220,14 @@ function createStyles(colors: ThemeColors) {
   callGraceButton: { width: '100%', backgroundColor: colors.surface, borderRadius: 9, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
   callGraceButtonText: { color: colors.greenDark, fontSize: 12, fontWeight: '900' },
   callGraceAcknowledged: { color: colors.lime, fontSize: 12, fontWeight: '900', marginTop: 16, textAlign: 'center' },
+  notificationWarning: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.amberBg, borderColor: colors.amberBorder, borderWidth: 1, borderRadius: 10, padding: 13, marginTop: 14 },
+  notificationWarningTitle: { color: colors.amber, fontSize: 13, fontWeight: '800' },
+  notificationWarningText: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  notificationEnableButton: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, backgroundColor: colors.primarySurface, alignItems: 'center', justifyContent: 'center' },
+  notificationEnableButtonText: { color: colors.white, fontSize: 11, fontWeight: '900' },
+  backgroundAlertRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 3 },
+  backgroundAlertAction: { minHeight: 48, borderRadius: 8, backgroundColor: colors.primarySurface, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  backgroundAlertActionText: { color: colors.white, fontSize: 9, fontWeight: '900', letterSpacing: 0.2 },
   ticketCard: { backgroundColor: colors.primarySurface, borderRadius: 9, padding: 22, marginTop: 22 },
   ticketLabel: { color: colors.onPrimaryMuted, fontSize: 9, fontWeight: '800', letterSpacing: 1.1, textAlign: 'center' },
   ticketNumber: { color: colors.onPrimary, fontSize: 58, fontWeight: '900', textAlign: 'center', marginTop: 9 },
@@ -1904,10 +2250,12 @@ function createStyles(colors: ThemeColors) {
   notice: { borderRadius: 13, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 14 },
   noticeText: { flex: 1, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   scannerRoot: { flex: 1, backgroundColor: colors.primarySurface },
-  scannerOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: 26, backgroundColor: colors.scanOverlay },
-  scannerBack: { position: 'absolute', top: 60, left: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: colors.scanBack },
-  scanFrame: { width: 250, height: 250, borderRadius: 12, borderWidth: 2, borderColor: colors.lime, marginBottom: 29 },
-  scannerPrompt: { alignItems: 'center' },
+  // Keep the live camera preview completely unobstructed. Only controls get a
+  // neutral scrim so labels stay readable without tinting the camera green.
+  scannerOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: 26 },
+  scannerBack: { position: 'absolute', top: 60, left: 22, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.scanBack },
+  scanFrame: { width: 250, height: 250, borderRadius: 16, borderWidth: 3, borderColor: colors.white, marginBottom: 29, shadowColor: '#000000', shadowOpacity: 0.45, shadowRadius: 8, elevation: 7 },
+  scannerPrompt: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.58)', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 16, maxWidth: '100%' },
   scannerTitle: { color: colors.white, fontSize: 20, fontWeight: '800', textAlign: 'center' },
   scannerSubtitle: { color: colors.scanCaption, fontSize: 13, marginTop: 8, textAlign: 'center' },
   scannerError: { color: '#FFD1C9', textAlign: 'center', fontSize: 12, lineHeight: 18, marginTop: 16 },

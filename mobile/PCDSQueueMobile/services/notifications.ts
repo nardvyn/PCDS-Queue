@@ -1,36 +1,39 @@
 import Constants from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+import { setNotificationChannelAsync } from 'expo-notifications/build/setNotificationChannelAsync';
+import {
+  AndroidImportance,
+  AndroidNotificationVisibility,
+} from 'expo-notifications/build/NotificationChannelManager.types';
 import { Platform } from 'react-native';
 
 const QUEUE_NOTIFICATION_CHANNEL = 'queue-calls';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: false,
-    shouldShowList: false,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+export function isExpoGo(): boolean {
+  return isRunningInExpoGo();
+}
 
-export async function getQueuePushToken(): Promise<string | null> {
-  if (Platform.OS !== 'android' || !Device.isDevice) {
+export async function getQueuePushToken(requestPermission = false): Promise<string | null> {
+  if (isExpoGo() || Platform.OS !== 'android' || !Device.isDevice) {
     return null;
   }
 
-  await Notifications.setNotificationChannelAsync(QUEUE_NOTIFICATION_CHANNEL, {
+  await setNotificationChannelAsync(QUEUE_NOTIFICATION_CHANNEL, {
     name: 'Queue Calls',
-    importance: Notifications.AndroidImportance.MAX,
+    importance: AndroidImportance.MAX,
     vibrationPattern: [0, 500, 250, 500, 250, 800],
     sound: 'notification.wav',
-    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    lockscreenVisibility: AndroidNotificationVisibility.PUBLIC,
     bypassDnd: false,
   });
 
-  let permission = await Notifications.getPermissionsAsync();
-  if (permission.status !== 'granted' && permission.canAskAgain) {
-    permission = await Notifications.requestPermissionsAsync();
+  const { getPermissionsAsync, requestPermissionsAsync } = await import(
+    'expo-notifications/build/NotificationPermissions'
+  );
+  let permission = await getPermissionsAsync();
+  if (requestPermission && permission.status !== 'granted' && permission.canAskAgain) {
+    permission = await requestPermissionsAsync();
   }
   if (permission.status !== 'granted') {
     return null;
@@ -43,6 +46,9 @@ export async function getQueuePushToken(): Promise<string | null> {
     throw new Error('The Expo project ID is missing; push notifications cannot be enabled.');
   }
 
-  const token = await Notifications.getExpoPushTokenAsync({ projectId });
+  const { getExpoPushTokenAsync } = await import(
+    'expo-notifications/build/getExpoPushTokenAsync'
+  );
+  const token = await getExpoPushTokenAsync({ projectId });
   return token.data;
 }

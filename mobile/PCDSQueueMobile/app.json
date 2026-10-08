@@ -2,10 +2,15 @@
   "expo": {
     "name": "PCDS Queue",
     "slug": "PCDSQueueMobile",
-    "version": "1.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/pcds-queue-icon.png",
     "userInterfaceStyle": "light",
+    "androidStatusBar": {
+      "backgroundColor": "#FFFFFF",
+      "barStyle": "dark-content",
+      "translucent": false
+    },
     "plugins": [
       [
         "expo-camera",
@@ -24,18 +29,28 @@
       [
         "expo-notifications",
         {
-          "sounds": ["./assets/notification.wav"],
+          "sounds": [
+            "./assets/notification.wav"
+          ],
           "defaultChannel": "queue-calls"
         }
       ],
+      [
+        "expo-status-bar",
+        {
+          "style": "dark"
+        }
+      ],
       "expo-font",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ],
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "edu.pcds.queue.mobile",
+      "package": "ph.edu.pcds.queue",
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#077F8D",
         "foregroundImage": "./assets/pcds-queue-adaptive.png"
@@ -44,7 +59,16 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "web": {
@@ -53,7 +77,16 @@
     "extra": {
       "eas": {
         "projectId": "6a1778a5-f20c-4fa4-b6b9-6080e4a87045"
+      },
+      "expo-status-bar": {
+        "style": "dark"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/6a1778a5-f20c-4fa4-b6b9-6080e4a87045"
     }
   }
 }

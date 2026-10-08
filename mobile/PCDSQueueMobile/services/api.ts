@@ -13,6 +13,11 @@ export type Department = {
   queue_is_open: boolean;
 };
 
+export type ActiveDepartment = Department & {
+  status: string;
+  kiosk_queue_enabled: boolean;
+};
+
 export type ValidatedQr = {
   valid: boolean;
   session_id: number;
@@ -112,6 +117,11 @@ export function getApiUrl(): string {
 
 export async function checkApiHealth(): Promise<void> {
   await request<{ status: string }>('api/health');
+}
+
+export async function getActiveDepartments(): Promise<ActiveDepartment[]> {
+  const response = await request<{ departments: ActiveDepartment[] }>('api/kiosk/departments');
+  return response.departments;
 }
 
 export async function validateQrToken(token: string): Promise<ValidatedQr> {

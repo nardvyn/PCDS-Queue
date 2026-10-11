@@ -33,6 +33,7 @@ import {
   Text,
   Vibration,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { getQueuePushToken, isExpoGo } from './services/notifications';
@@ -201,6 +202,7 @@ export default function App() {
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean | null>(null);
   const [notificationsCanAskAgain, setNotificationsCanAskAgain] = useState(true);
   const runningInExpoGo = isExpoGo();
+  const { width } = useWindowDimensions();
   const announcementCursor = useRef<{ queueId: number | null; eventId: number | null }>({
     queueId: null,
     eventId: null,
@@ -208,7 +210,7 @@ export default function App() {
   const pushTokenQueueId = useRef<number | null>(null);
   const handledNotificationResponse = useRef<string | null>(null);
   const colors = preferences.darkMode ? darkColors : lightColors;
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, width), [colors, width]);
   const appTheme = useMemo(() => ({ colors, styles }), [colors, styles]);
   const announcementPlayer = useAudioPlayer(require('./assets/notification.wav'));
   const activeQueueId = ticket?.queue_id;
@@ -2093,12 +2095,19 @@ function createQueueAnnouncementMessage(alert: QueueAlertPresentation): string {
     : `Your queue number ${alert.queueNumber} is being called. Please proceed to ${windowLabel}.`;
 }
 
-function createStyles(colors: ThemeColors) {
+function createStyles(colors: ThemeColors, width: number) {
   return StyleSheet.create({
   appRoot: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   safeArea: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { flexGrow: 1, paddingHorizontal: 22, paddingBottom: 22 },
+  scrollContent: {
+    flexGrow: 1,
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
+    paddingHorizontal: width < 360 ? 16 : width >= 768 ? 32 : 22,
+    paddingBottom: 22,
+  },
   header: { minHeight: 74, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   brandMark: { width: 42, height: 42, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
@@ -2117,8 +2126,8 @@ function createStyles(colors: ThemeColors) {
   splashLocation: { color: '#BDE5E8', fontSize: 11, marginTop: 5 },
   connectionRestoredBanner: { position: 'absolute', top: 52, left: 16, right: 16, backgroundColor: colors.mint, borderColor: colors.green, borderWidth: 1, borderRadius: 10, padding: 12, zIndex: 20 },
   connectionRestoredText: { color: colors.greenDark, fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  connectionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 },
-  connectionCard: { backgroundColor: colors.surface, borderRadius: 18, padding: 28, alignItems: 'center' },
+  connectionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: width < 360 ? 16 : 24 },
+  connectionCard: { width: '100%', maxWidth: 440, alignSelf: 'center', backgroundColor: colors.surface, borderRadius: 18, padding: width < 360 ? 20 : 28, alignItems: 'center' },
   connectionTitle: { color: colors.amber, fontSize: 13, fontWeight: '900', letterSpacing: 1.2, marginTop: 10 },
   connectionStatus: { color: colors.ink, fontSize: 21, fontWeight: '900', marginTop: 8, textAlign: 'center' },
   connectionLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', marginTop: 22 },
@@ -2254,14 +2263,14 @@ function createStyles(colors: ThemeColors) {
   // neutral scrim so labels stay readable without tinting the camera green.
   scannerOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: 26 },
   scannerBack: { position: 'absolute', top: 60, left: 22, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.scanBack },
-  scanFrame: { width: 250, height: 250, borderRadius: 16, borderWidth: 3, borderColor: colors.white, marginBottom: 29, shadowColor: '#000000', shadowOpacity: 0.45, shadowRadius: 8, elevation: 7 },
+  scanFrame: { width: Math.min(250, width - 64), height: Math.min(250, width - 64), borderRadius: 16, borderWidth: 3, borderColor: colors.white, marginBottom: 29, shadowColor: '#000000', shadowOpacity: 0.45, shadowRadius: 8, elevation: 7 },
   scannerPrompt: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.58)', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 16, maxWidth: '100%' },
   scannerTitle: { color: colors.white, fontSize: 20, fontWeight: '800', textAlign: 'center' },
   scannerSubtitle: { color: colors.scanCaption, fontSize: 13, marginTop: 8, textAlign: 'center' },
   scannerError: { color: '#FFD1C9', textAlign: 'center', fontSize: 12, lineHeight: 18, marginTop: 16 },
   cameraPermissionState: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: 30, gap: 10 },
-  bottomNav: { flexDirection: 'row', backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line, paddingVertical: 10 },
-  navItem: { flex: 1, alignItems: 'center', gap: 4, minHeight: 38, justifyContent: 'center' },
+  bottomNav: { width: '100%', maxWidth: 640, alignSelf: 'center', flexDirection: 'row', backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line, paddingVertical: 6 },
+  navItem: { flex: 1, alignItems: 'center', gap: 4, minHeight: 48, justifyContent: 'center' },
   navItemDisabled: { opacity: 0.45 },
   navText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
   navTextActive: { color: colors.green },

@@ -962,6 +962,11 @@ export default function App() {
         return;
       }
     }
+    StatusBar.setHidden(false, 'fade');
+    StatusBar.setBarStyle('dark-content', true);
+    if (Platform.OS === 'android') {
+      StatusBar.setBackgroundColor(colors.white, true);
+    }
     setScreen('scanner');
   };
 

@@ -127,7 +127,7 @@ def _staff_account_values(data, include_password=False):
         return None, "Full name is required and must be at most 150 characters."
     if not isinstance(username, str) or not username.strip() or len(username.strip()) > 100:
         return None, "Username is required and must be at most 100 characters."
-    if isinstance(department_id, bool) or not isinstance(department_id, int) or department_id <= 0:
+    if department_id is not None and (isinstance(department_id, bool) or not isinstance(department_id, int) or department_id <= 0):
         return None, "A valid department_id is required."
     if account_status not in ("ACTIVE", "INACTIVE"):
         return None, "account_status must be ACTIVE or INACTIVE."
@@ -159,7 +159,7 @@ def get_staff_accounts():
         return jsonify({"message": "status must be ACTIVE, INACTIVE, or SUSPENDED."}), 400
 
     search = request.args.get("search", "").strip()
-    filters = ["su.role = 'STAFF'"]
+    filters = ["su.role = 'STAFF'", "su.username NOT LIKE '%[DELETED:%'"]
     params = {}
     if department_id is not None:
         filters.append("su.department_id = :department_id")
@@ -213,12 +213,13 @@ def create_staff_account():
         return jsonify({"message": error_message}), 400
 
     try:
-        department = db.session.execute(
-            text("SELECT department_id FROM departments WHERE department_id = :department_id AND is_active = 1"),
-            {"department_id": values["department_id"]}
-        ).first()
-        if not department:
-            return jsonify({"message": "Select an active department."}), 400
+        if values["department_id"] is not None:
+            department = db.session.execute(
+                text("SELECT department_id FROM departments WHERE department_id = :department_id AND is_active = 1"),
+                {"department_id": values["department_id"]}
+            ).first()
+            if not department:
+                return jsonify({"message": "Select an active department."}), 400
 
         result = db.session.execute(
             text("""
@@ -265,12 +266,13 @@ def update_staff_account(staff_id):
         if not staff:
             return jsonify({"message": "Staff account not found."}), 404
 
-        department = db.session.execute(
-            text("SELECT department_id FROM departments WHERE department_id = :department_id AND is_active = 1"),
-            {"department_id": values["department_id"]}
-        ).first()
-        if not department:
-            return jsonify({"message": "Select an active department."}), 400
+        if values["department_id"] is not None:
+            department = db.session.execute(
+                text("SELECT department_id FROM departments WHERE department_id = :department_id AND is_active = 1"),
+                {"department_id": values["department_id"]}
+            ).first()
+            if not department:
+                return jsonify({"message": "Select an active department."}), 400
 
         if staff["department_id"] != values["department_id"]:
             active_shift = db.session.execute(
@@ -344,6 +346,65 @@ def update_staff_account_status(staff_id):
         return jsonify({"message": "Unable to update staff account status."}), 500
 
 
+@admin_bp.route("/staff/<int:staff_id>", methods=["DELETE"])
+@jwt_required()
+def delete_staff_account(staff_id):
+    _, error = _admin_id_or_response()
+    if error:
+        return error
+
+    try:
+        staff = db.session.execute(
+            text("""
+                SELECT staff_id, username
+                FROM staff_users
+                WHERE staff_id = :staff_id AND role = 'STAFF'
+                FOR UPDATE
+            """),
+            {"staff_id": staff_id}
+        ).mappings().first()
+        if not staff:
+            return jsonify({"message": "Staff account not found."}), 404
+
+        active_shift = db.session.execute(
+            text("""
+                SELECT shift_id
+                FROM staff_shifts
+                WHERE staff_id = :staff_id AND status = 'ACTIVE'
+                LIMIT 1
+            """),
+            {"staff_id": staff_id}
+        ).first()
+        if active_shift:
+            db.session.rollback()
+            return jsonify({"message": "End the staff member's active shift before deleting this account."}), 409
+
+        unique_id = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+        deleted_username = f"deleted-{staff_id}-[DELETED:{unique_id}]"
+        db.session.execute(
+            text("""
+                UPDATE staff_users
+                SET username = :username,
+                    department_id = NULL,
+                    account_status = 'INACTIVE'
+                WHERE staff_id = :staff_id AND role = 'STAFF'
+            """),
+            {"staff_id": staff_id, "username": deleted_username}
+        )
+        db.session.execute(
+            text("UPDATE service_windows SET assigned_staff_id = NULL WHERE assigned_staff_id = :staff_id"),
+            {"staff_id": staff_id}
+        )
+        db.session.commit()
+        return jsonify({"message": "Staff account deleted. Queue and shift history has been retained."}), 200
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"message": "Unable to release the staff username."}), 409
+    except Exception:
+        db.session.rollback()
+        return jsonify({"message": "Unable to delete staff account."}), 500
+
+
 @admin_bp.route("/staff/<int:staff_id>/reset-password", methods=["POST"])
 @jwt_required()
 def reset_staff_password(staff_id):
@@ -388,6 +449,7 @@ def get_departments():
                    d.is_active, COUNT(CASE WHEN sw.status = 'ACTIVE' THEN 1 END) AS window_count
             FROM departments d
             LEFT JOIN service_windows sw ON sw.department_id = d.department_id
+            WHERE d.department_name NOT LIKE '% [DELETED:%'
             GROUP BY d.department_id, d.department_name, d.queue_prefix, d.is_active
             ORDER BY d.department_name
         """)
@@ -489,6 +551,8 @@ def update_department(department_id):
         ).mappings().first()
         if not department:
             return jsonify({"message": "Department not found."}), 404
+        if " [DELETED:" in department["department_name"]:
+            return jsonify({"message": "Deleted departments cannot be edited."}), 404
 
         if department["is_active"] and not values["is_active"]:
             active_shift = db.session.execute(
@@ -529,6 +593,7 @@ def update_department(department_id):
                        ) AS has_active_shift
                 FROM service_windows sw
                 WHERE sw.department_id = :department_id
+                  AND sw.window_name NOT LIKE '% [DELETED:%'
                 ORDER BY sw.window_number
                 FOR UPDATE
             """),
@@ -613,11 +678,18 @@ def update_department_status(department_id):
 
     try:
         department = db.session.execute(
-            text("SELECT department_id FROM departments WHERE department_id = :department_id FOR UPDATE"),
+            text("""
+                SELECT department_id, department_name
+                FROM departments
+                WHERE department_id = :department_id
+                FOR UPDATE
+            """),
             {"department_id": department_id}
-        ).first()
+        ).mappings().first()
         if not department:
             return jsonify({"message": "Department not found."}), 404
+        if " [DELETED:" in department["department_name"]:
+            return jsonify({"message": "Deleted departments cannot be restored."}), 404
 
         if not is_active:
             active_shift = db.session.execute(
@@ -644,6 +716,113 @@ def update_department_status(department_id):
         return jsonify({"message": "Unable to update department status."}), 500
 
 
+@admin_bp.route("/departments/<int:department_id>", methods=["DELETE"])
+@jwt_required()
+def delete_department(department_id):
+    _, error = _admin_id_or_response()
+    if error:
+        return error
+
+    try:
+        department = db.session.execute(
+            text("""
+                SELECT department_id, department_name, is_active
+                FROM departments
+                WHERE department_id = :department_id
+                FOR UPDATE
+            """),
+            {"department_id": department_id}
+        ).mappings().first()
+        if not department:
+            return jsonify({"message": "Department not found."}), 404
+
+        if " [DELETED:" in department["department_name"]:
+            return jsonify({"message": "Department has already been deleted."}), 404
+        active_shift = db.session.execute(
+            text("""
+                SELECT shift_id
+                FROM staff_shifts
+                WHERE department_id = :department_id AND status = 'ACTIVE'
+                LIMIT 1
+            """),
+            {"department_id": department_id}
+        ).first()
+        if active_shift:
+            db.session.rollback()
+            return jsonify({"message": "End active staff shifts before deleting this department."}), 409
+
+        db.session.execute(
+            text("""
+                UPDATE staff_users
+                SET department_id = NULL, account_status = 'INACTIVE'
+                WHERE department_id = :department_id AND role = 'STAFF'
+            """),
+            {"department_id": department_id}
+        )
+        db.session.execute(
+            text("""
+                UPDATE service_windows
+                SET status = 'CLOSED', assigned_staff_id = NULL
+                WHERE department_id = :department_id
+            """),
+            {"department_id": department_id}
+        )
+
+        existing_names = {
+            row["department_name"]
+            for row in db.session.execute(
+                text("SELECT department_name FROM departments WHERE department_id != :department_id"),
+                {"department_id": department_id}
+            ).mappings()
+        }
+        existing_prefixes = {
+            row["queue_prefix"]
+            for row in db.session.execute(
+                text("SELECT queue_prefix FROM departments WHERE department_id != :department_id"),
+                {"department_id": department_id}
+            ).mappings()
+        }
+
+        suffix = f" [DELETED:{department_id}]"
+        name = f"{department['department_name'][:100 - len(suffix)]}{suffix}"
+        attempt = 1
+        while name in existing_names:
+            suffix = f" [DELETED:{department_id}-{attempt}]"
+            name = f"{department['department_name'][:100 - len(suffix)]}{suffix}"
+            attempt += 1
+
+        for offset in range(len(existing_prefixes) + 1):
+            prefix_number = (department_id + offset) % 1_000_000_000
+            prefix = f"D{prefix_number:09d}"
+            if prefix not in existing_prefixes:
+                break
+
+        db.session.execute(
+            text("""
+                UPDATE departments
+                SET department_name = :department_name,
+                    queue_prefix = :queue_prefix,
+                    is_active = 0
+                WHERE department_id = :department_id
+            """),
+            {
+                "department_id": department_id,
+                "department_name": name,
+                "queue_prefix": prefix
+            }
+        )
+        db.session.commit()
+        return jsonify({
+            "message": "Department removed. Its queue history has been retained."
+        }), 200
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"message": "Unable to free the department name and queue prefix."}), 409
+    except Exception:
+        db.session.rollback()
+        return jsonify({"message": "Unable to delete department."}), 500
+
+
 @admin_bp.route("/windows", methods=["GET"])
 @jwt_required()
 def get_service_windows():
@@ -656,9 +835,12 @@ def get_service_windows():
         return jsonify({"message": "department_id must be an integer."}), 400
 
     params = {}
-    department_filter = ""
+    department_filter = """
+        WHERE d.department_name NOT LIKE '% [DELETED:%'
+          AND sw.window_name NOT LIKE '% [DELETED:%'
+    """
     if department_id is not None:
-        department_filter = "WHERE d.department_id = :department_id"
+        department_filter += " AND d.department_id = :department_id"
         params["department_id"] = department_id
 
     rows = db.session.execute(
@@ -851,6 +1033,63 @@ def update_service_window_status(window_id):
     except Exception:
         db.session.rollback()
         return jsonify({"message": "Unable to update service window status."}), 500
+
+
+@admin_bp.route("/windows/<int:window_id>", methods=["DELETE"])
+@jwt_required()
+def delete_service_window(window_id):
+    _, error = _admin_id_or_response()
+    if error:
+        return error
+
+    try:
+        window = db.session.execute(
+            text("""
+                SELECT window_id, window_name
+                FROM service_windows
+                WHERE window_id = :window_id
+                FOR UPDATE
+            """),
+            {"window_id": window_id}
+        ).mappings().first()
+        if not window:
+            return jsonify({"message": "Service window not found."}), 404
+        if " [DELETED:" in window["window_name"]:
+            return jsonify({"message": "Service window has already been deleted."}), 404
+
+        active_shift = db.session.execute(
+            text("""
+                SELECT shift_id
+                FROM staff_shifts
+                WHERE window_id = :window_id AND status = 'ACTIVE'
+                LIMIT 1
+            """),
+            {"window_id": window_id}
+        ).first()
+        if active_shift:
+            db.session.rollback()
+            return jsonify({"message": "End the active staff shift before deleting this window."}), 409
+
+        unique_id = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+        deleted_name = f"Deleted [DELETED:{window_id}-{unique_id}]"
+        db.session.execute(
+            text("""
+                UPDATE service_windows
+                SET window_name = :window_name, status = 'CLOSED', assigned_staff_id = NULL
+                WHERE window_id = :window_id
+            """),
+            {"window_id": window_id, "window_name": deleted_name}
+        )
+        db.session.commit()
+        return jsonify({
+            "message": "Service window deleted. Queue and shift history has been retained."
+        }), 200
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"message": "Unable to delete service window."}), 409
+    except Exception:
+        db.session.rollback()
+        return jsonify({"message": "Unable to delete service window."}), 500
 
 
 @admin_bp.route("/dashboard", methods=["GET"])
@@ -1483,14 +1722,18 @@ def update_admin_settings():
         for key, value in values.items():
             db.session.execute(
                 text("""
-                    INSERT INTO system_settings (setting_key, setting_value)
-                    VALUES (:setting_key, :setting_value)
+                    INSERT INTO system_settings (setting_key, setting_value, description, updated_by)
+                    VALUES (:setting_key, :setting_value, :description, :updated_by)
                     ON DUPLICATE KEY UPDATE
-                        setting_value = VALUES(setting_value)
+                        setting_value = VALUES(setting_value),
+                        description = VALUES(description),
+                        updated_by = VALUES(updated_by)
                 """),
                 {
                     "setting_key": key,
-                    "setting_value": str(value).lower() if isinstance(value, bool) else str(value)
+                    "setting_value": str(value).lower() if isinstance(value, bool) else str(value),
+                    "description": SYSTEM_SETTING_DESCRIPTIONS[key],
+                    "updated_by": admin_id
                 }
             )
         db.session.commit()

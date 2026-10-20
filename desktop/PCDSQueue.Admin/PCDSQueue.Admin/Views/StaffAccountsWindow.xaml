@@ -46,8 +46,10 @@
                     IsEnabled="False" Click="EditStaffButton_Click" />
             <Button x:Name="ResetPasswordButton" Content="RESET PASSWORD" Width="145" Height="36"
                     Margin="8,0,0,0" IsEnabled="False" Click="ResetPasswordButton_Click" />
-            <Button x:Name="ToggleStatusButton" Content="DEACTIVATE" Width="130" Height="36"
-                    Margin="8,0,0,0" IsEnabled="False" Click="ToggleStatusButton_Click" />
+            <Button x:Name="ArchiveStaffButton" Content="ARCHIVE" Width="110" Height="36"
+                    Margin="8,0,0,0" IsEnabled="False" Click="ArchiveStaffButton_Click" />
+            <Button x:Name="DeleteStaffButton" Content="DELETE" Width="90" Height="36"
+                    Margin="8,0,0,0" IsEnabled="False" Click="DeleteStaffButton_Click" />
         </StackPanel>
         <TextBlock x:Name="StaffErrorText" Grid.Row="5" Foreground="#DC3545"
                    TextWrapping="Wrap" Visibility="Collapsed" />

@@ -40,6 +40,9 @@ public sealed class ServiceWindowService
             $"api/admin/windows/{windowId}/status",
             new { is_active = isActive }));
 
+    public Task DeleteWindowAsync(int windowId) =>
+        SendAsync(() => ApiService.Client.DeleteAsync($"api/admin/windows/{windowId}"));
+
     private static async Task SendAsync(Func<Task<HttpResponseMessage>> send)
     {
         using var response = await send();

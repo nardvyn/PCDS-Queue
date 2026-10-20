@@ -63,7 +63,11 @@ public partial class ServiceWindowsWindow : UserControl
         _loadingWindows = true;
         try
         {
-            WindowsGrid.ItemsSource = await _windowService.GetWindowsAsync(department.DepartmentId);
+            WindowsGrid.ItemsSource = (await _windowService.GetWindowsAsync(department.DepartmentId))
+                .Where(window => !window.WindowName.Contains(
+                    " [DELETED:",
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
             WindowsErrorText.Visibility = Visibility.Collapsed;
         }
         catch (Exception ex)
@@ -107,15 +111,26 @@ public partial class ServiceWindowsWindow : UserControl
             await LoadWindowsAsync();
     }
 
-    private async void ToggleWindowStatusButton_Click(object sender, RoutedEventArgs e)
+    private async void ArchiveWindowButton_Click(object sender, RoutedEventArgs e)
     {
         if (WindowsGrid.SelectedItem is not ServiceWindowModel window)
             return;
 
-        ToggleWindowStatusButton.IsEnabled = false;
+        var archive = window.IsActive;
+        if (archive && MessageBox.Show(
+                $"Archive {window.WindowName}?\n\nIt will no longer be available for queue service, but its queue and shift history will be kept. You can restore it later.",
+                "Archive service window",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        ArchiveWindowButton.IsEnabled = false;
         try
         {
-            await _windowService.SetWindowStatusAsync(window.WindowId, !window.IsActive);
+            await _windowService.SetWindowStatusAsync(window.WindowId, !archive);
             await LoadWindowsAsync();
         }
         catch (Exception ex)
@@ -127,14 +142,43 @@ public partial class ServiceWindowsWindow : UserControl
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e) => await LoadWindowsAsync();
 
+    private async void DeleteWindowButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (WindowsGrid.SelectedItem is not ServiceWindowModel window)
+            return;
+
+        if (MessageBox.Show(
+                $"Delete {window.WindowName}?\n\nIt will be removed from service-window lists, while its queue and shift history will be retained. A window currently in use must have its staff shift ended first.",
+                "Delete service window",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        DeleteWindowButton.IsEnabled = false;
+        try
+        {
+            await _windowService.DeleteWindowAsync(window.WindowId);
+            await LoadWindowsAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+            UpdateActions();
+        }
+    }
+
     private void WindowsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateActions();
 
     private void UpdateActions()
     {
         var selected = WindowsGrid.SelectedItem as ServiceWindowModel;
         EditWindowButton.IsEnabled = !_loadingWindows && selected is not null;
-        ToggleWindowStatusButton.IsEnabled = !_loadingWindows && selected is not null;
-        ToggleWindowStatusButton.Content = selected?.IsActive == true ? "DEACTIVATE" : "ACTIVATE";
+        ArchiveWindowButton.IsEnabled = !_loadingWindows && selected is not null;
+        ArchiveWindowButton.Content = selected?.IsActive == true ? "ARCHIVE" : "RESTORE";
+        DeleteWindowButton.IsEnabled = !_loadingWindows && selected is not null;
     }
 
     private void ShowError(string message)

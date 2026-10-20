@@ -33,6 +33,9 @@ public sealed class StaffAccountService
             $"api/admin/staff/{staffId}/status",
             new { account_status = accountStatus }));
 
+    public Task DeleteStaffAsync(int staffId) =>
+        SendAsync(() => ApiService.Client.DeleteAsync($"api/admin/staff/{staffId}"));
+
     public Task ResetPasswordAsync(int staffId, string password) =>
         SendAsync(() => ApiService.Client.PostAsJsonAsync(
             $"api/admin/staff/{staffId}/reset-password",
@@ -50,7 +53,7 @@ public sealed class StaffAccountService
         if (response.IsSuccessStatusCode)
             return;
 
-        var message = "The server could not complete the staff-account request.";
+        var message = $"The staff-account request failed with HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).";
         try
         {
             using var document = JsonDocument.Parse(json);

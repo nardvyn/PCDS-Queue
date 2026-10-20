@@ -34,8 +34,10 @@
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="EditWindowButton" Content="EDIT" Width="90" Height="36"
                     IsEnabled="False" Click="EditWindowButton_Click" />
-            <Button x:Name="ToggleWindowStatusButton" Content="DEACTIVATE" Width="120" Height="36"
-                    Margin="8,0,0,0" IsEnabled="False" Click="ToggleWindowStatusButton_Click" />
+            <Button x:Name="ArchiveWindowButton" Content="ARCHIVE" Width="110" Height="36"
+                    Margin="8,0,0,0" IsEnabled="False" Click="ArchiveWindowButton_Click" />
+            <Button x:Name="DeleteWindowButton" Content="DELETE" Width="90" Height="36"
+                    Margin="8,0,0,0" IsEnabled="False" Click="DeleteWindowButton_Click" />
         </StackPanel>
         <TextBlock x:Name="WindowsErrorText" Grid.Row="5" Foreground="#DC3545"
                    TextWrapping="Wrap" Visibility="Collapsed" />

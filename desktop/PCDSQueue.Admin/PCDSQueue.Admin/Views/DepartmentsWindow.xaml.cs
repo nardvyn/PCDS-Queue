@@ -8,6 +8,7 @@ namespace PCDSQueue.Admin.Views;
 public partial class DepartmentsWindow : UserControl
 {
     private readonly DepartmentService _departmentService = new();
+    private List<DepartmentModel> _departments = [];
     private bool _isLoading;
 
     public DepartmentsWindow()
@@ -23,7 +24,12 @@ public partial class DepartmentsWindow : UserControl
         _isLoading = true;
         try
         {
-            DepartmentsGrid.ItemsSource = await _departmentService.GetDepartmentsAsync();
+            _departments = (await _departmentService.GetDepartmentsAsync())
+                .Where(department => !department.DepartmentName.Contains(
+                    " [DELETED:",
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            DepartmentsGrid.ItemsSource = _departments;
             DepartmentsErrorText.Visibility = Visibility.Collapsed;
         }
         catch (Exception ex)
@@ -55,17 +61,57 @@ public partial class DepartmentsWindow : UserControl
             await LoadDepartmentsAsync();
     }
 
-    private async void ToggleStatusButton_Click(object sender, RoutedEventArgs e)
+    private async void ArchiveDepartmentButton_Click(object sender, RoutedEventArgs e)
     {
         if (DepartmentsGrid.SelectedItem is not DepartmentModel department)
             return;
 
-        ToggleStatusButton.IsEnabled = false;
+        var archive = department.IsActive;
+        if (archive && MessageBox.Show(
+                $"Archive {department.DepartmentName}?\n\nIt will be removed from active queue operations, but its queue history will be kept. You can restore it later.",
+                "Archive department",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        ArchiveDepartmentButton.IsEnabled = false;
         try
         {
             await _departmentService.SetDepartmentStatusAsync(
                 department.DepartmentId,
-                !department.IsActive);
+                !archive);
+            await LoadDepartmentsAsync();
+        }
+        catch (Exception ex)
+        {
+            DepartmentsErrorText.Text = ex.Message;
+            DepartmentsErrorText.Visibility = Visibility.Visible;
+            UpdateSelectionActions();
+        }
+    }
+
+    private async void DeleteDepartmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DepartmentsGrid.SelectedItem is not DepartmentModel department)
+            return;
+
+        if (MessageBox.Show(
+                $"Delete {department.DepartmentName}?\n\nThis can be done directly without archiving first. Its queue history will be kept under a deleted label, and its name and prefix will be released.",
+                "Delete department",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        DeleteDepartmentButton.IsEnabled = false;
+        try
+        {
+            await _departmentService.DeleteDepartmentAsync(department.DepartmentId);
             await LoadDepartmentsAsync();
         }
         catch (Exception ex)
@@ -84,8 +130,9 @@ public partial class DepartmentsWindow : UserControl
     {
         var selected = DepartmentsGrid.SelectedItem as DepartmentModel;
         EditDepartmentButton.IsEnabled = !_isLoading && selected is not null;
-        ToggleStatusButton.IsEnabled = !_isLoading && selected is not null;
-        ToggleStatusButton.Content = selected?.IsActive == true ? "DEACTIVATE" : "ACTIVATE";
+        ArchiveDepartmentButton.IsEnabled = !_isLoading && selected is not null;
+        ArchiveDepartmentButton.Content = selected?.IsActive == true ? "ARCHIVE" : "RESTORE";
+        DeleteDepartmentButton.IsEnabled = !_isLoading && selected is not null;
     }
 
 }

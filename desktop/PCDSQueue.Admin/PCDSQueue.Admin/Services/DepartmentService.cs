@@ -33,6 +33,9 @@ public sealed class DepartmentService
             $"api/admin/departments/{departmentId}/status",
             new { is_active = isActive }));
 
+    public Task DeleteDepartmentAsync(int departmentId) =>
+        SendAsync(() => ApiService.Client.DeleteAsync($"api/admin/departments/{departmentId}"));
+
     private static async Task SendAsync(Func<Task<HttpResponseMessage>> send)
     {
         using var response = await send();
@@ -45,7 +48,7 @@ public sealed class DepartmentService
         if (response.IsSuccessStatusCode)
             return;
 
-        var message = "The server could not complete the department request.";
+        var message = $"The department request failed with HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).";
         try
         {
             using var document = JsonDocument.Parse(json);

@@ -25,7 +25,11 @@ public partial class StaffAccountsWindow : UserControl
         try
         {
             _departments = await _departmentService.GetDepartmentsAsync();
-            _staffAccounts = await _staffService.GetStaffAsync();
+            _staffAccounts = (await _staffService.GetStaffAsync())
+                .Where(staff => !staff.Username.Contains(
+                    "[DELETED:",
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
             LoadDepartmentFilter();
             ApplyFilters();
             StaffErrorText.Visibility = Visibility.Collapsed;
@@ -111,16 +115,55 @@ public partial class StaffAccountsWindow : UserControl
             await RefreshAsync();
     }
 
-    private async void ToggleStatusButton_Click(object sender, RoutedEventArgs e)
+    private async void ArchiveStaffButton_Click(object sender, RoutedEventArgs e)
     {
         if (StaffGrid.SelectedItem is not StaffAccountModel staff)
             return;
 
-        ToggleStatusButton.IsEnabled = false;
+        var archive = staff.AccountStatus == "ACTIVE";
+        if (archive && MessageBox.Show(
+                $"Archive {staff.FullName}'s account?\n\nThe staff member will lose access, but shift and queue history will be kept. You can restore the account later.",
+                "Archive staff account",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        ArchiveStaffButton.IsEnabled = false;
         try
         {
-            var status = staff.AccountStatus == "ACTIVE" ? "INACTIVE" : "ACTIVE";
+            var status = archive ? "INACTIVE" : "ACTIVE";
             await _staffService.SetStaffStatusAsync(staff.StaffId, status);
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+            UpdateActions();
+        }
+    }
+
+    private async void DeleteStaffButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (StaffGrid.SelectedItem is not StaffAccountModel staff)
+            return;
+
+        if (MessageBox.Show(
+                $"Delete {staff.FullName}'s account?\n\nThe account will be deactivated and unassigned, and its username will be released. Queue and shift history will be retained.",
+                "Delete staff account",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        DeleteStaffButton.IsEnabled = false;
+        try
+        {
+            await _staffService.DeleteStaffAsync(staff.StaffId);
             await RefreshAsync();
         }
         catch (Exception ex)
@@ -152,8 +195,9 @@ public partial class StaffAccountsWindow : UserControl
         var hasSelection = !_isLoading && selected is not null;
         EditStaffButton.IsEnabled = hasSelection;
         ResetPasswordButton.IsEnabled = hasSelection;
-        ToggleStatusButton.IsEnabled = hasSelection;
-        ToggleStatusButton.Content = selected?.AccountStatus == "ACTIVE" ? "DEACTIVATE" : "ACTIVATE";
+        ArchiveStaffButton.IsEnabled = hasSelection;
+        ArchiveStaffButton.Content = selected?.AccountStatus == "ACTIVE" ? "ARCHIVE" : "RESTORE";
+        DeleteStaffButton.IsEnabled = hasSelection;
         AddStaffButton.IsEnabled = !_isLoading && _departments.Any(department => department.IsActive);
     }
 

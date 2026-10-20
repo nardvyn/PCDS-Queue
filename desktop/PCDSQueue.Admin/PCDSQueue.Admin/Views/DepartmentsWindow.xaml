@@ -13,12 +13,6 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
             <Grid Grid.Row="0">
-                <StackPanel>
-                    <TextBlock Text="DEPARTMENTS" Foreground="{StaticResource TextBrush}"
-                               FontSize="26" FontWeight="Bold" />
-                    <TextBlock Text="Configure campus departments and their service windows"
-                               Foreground="{StaticResource MutedTextBrush}" FontSize="13" Margin="0,5,0,0" />
-                </StackPanel>
                 <Button Content="+  ADD DEPARTMENT" Style="{StaticResource PrimaryButton}"
                         Width="180" Height="42" HorizontalAlignment="Right"
                         Click="AddDepartmentButton_Click" />
@@ -26,20 +20,51 @@
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="EditDepartmentButton" Content="EDIT" Width="90" Height="36"
                         IsEnabled="False" Click="EditDepartmentButton_Click" />
-                <Button x:Name="ToggleStatusButton" Content="DEACTIVATE" Width="120" Height="36"
-                        Margin="8,0,0,0" IsEnabled="False" Click="ToggleStatusButton_Click" />
+                <Button x:Name="ArchiveDepartmentButton" Content="ARCHIVE" Width="110" Height="36"
+                        Margin="8,0,0,0" IsEnabled="False" Click="ArchiveDepartmentButton_Click" />
+                <Button x:Name="DeleteDepartmentButton" Content="DELETE" Width="90" Height="36"
+                        Margin="8,0,0,0" IsEnabled="False" Click="DeleteDepartmentButton_Click" />
                 <Button Content="REFRESH" Width="90" Height="36" Margin="8,0,0,0"
                         Click="RefreshButton_Click" />
             </StackPanel>
             <TextBlock x:Name="DepartmentsErrorText" Grid.Row="4" Foreground="#DC3545"
                        TextWrapping="Wrap" Visibility="Collapsed" />
-            <Border Grid.Row="6" Style="{StaticResource DashboardCard}" Padding="18">
+            <Border Grid.Row="6" Style="{StaticResource DashboardCard}" Padding="0">
                 <DataGrid x:Name="DepartmentsGrid" AutoGenerateColumns="False" IsReadOnly="True"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single"
-                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                          BorderThickness="0" RowHeight="54" ColumnHeaderHeight="44"
+                          HeadersVisibility="Column" GridLinesVisibility="None"
+                          BorderThickness="0" RowHeight="48" ColumnHeaderHeight="42"
                           AlternatingRowBackground="#F8FAFC" Background="White"
                           SelectionChanged="DepartmentsGrid_SelectionChanged">
+                    <DataGrid.Resources>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="#F8FAFC" />
+                            <Setter Property="Foreground" Value="#526579" />
+                            <Setter Property="FontSize" Value="11" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                            <Setter Property="Padding" Value="14,0" />
+                            <Setter Property="BorderBrush" Value="#E2E8F0" />
+                            <Setter Property="BorderThickness" Value="0,0,0,1" />
+                            <Setter Property="HorizontalContentAlignment" Value="Left" />
+                        </Style>
+                        <Style TargetType="DataGridCell">
+                            <Setter Property="Padding" Value="14,0" />
+                            <Setter Property="VerticalContentAlignment" Value="Center" />
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            <Setter Property="BorderBrush" Value="#E2E8F0" />
+                            <Setter Property="BorderThickness" Value="0,0,0,1" />
+                        </Style>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="Background" Value="White" />
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="#E6F4F5" />
+                                    <Setter Property="Foreground" Value="#172033" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.Resources>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="DEPARTMENT" Binding="{Binding DepartmentName}" Width="*" />
                         <DataGridTextColumn Header="PREFIX" Binding="{Binding QueuePrefix}" Width="120" />

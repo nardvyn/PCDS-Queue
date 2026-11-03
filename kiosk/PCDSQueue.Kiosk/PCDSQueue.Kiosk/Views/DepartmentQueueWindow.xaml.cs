@@ -26,6 +26,8 @@ public partial class DepartmentQueueWindow : Window
     private bool _isGeneratingTicket;
     private bool _queueOpen;
     private bool _kioskQueueEnabled = true;
+    private bool _queueAtCapacity;
+    private bool _dailyQueueLimitReached;
     private string? _qrSessionToken;
     private QueueTicketModel? _pendingTicket;
 
@@ -50,9 +52,9 @@ public partial class DepartmentQueueWindow : Window
         if (!IsServerOnline())
             return;
 
-        if (QrImage.Source is null)
-            await LoadQrAsync();
         await RefreshQueueStatusAsync();
+        if (_canAcceptQueueEntry() && QrImage.Source is null)
+            await LoadQrAsync();
     }
 
     private async Task CheckServerAsync()
@@ -101,14 +103,39 @@ public partial class DepartmentQueueWindow : Window
             WaitingCountText.Text = status.WaitingCount.ToString();
             _queueOpen = status.Department?.QueueIsOpen == true;
             _kioskQueueEnabled = status.Department?.KioskQueueEnabled ?? true;
-            QueueStateText.Text = !_kioskQueueEnabled
+            _queueAtCapacity = status.ActiveQueueCount >= status.ActiveQueueLimit;
+            _dailyQueueLimitReached = status.DailyQueueCount >= status.DailyQueueLimit;
+            QueueCapacityText.Text =
+                $"ACTIVE: {status.ActiveQueueCount} / {status.ActiveQueueLimit}   TODAY: {status.DailyQueueCount} / {status.DailyQueueLimit}";
+            QueueStateText.Text = _queueAtCapacity
+                ? "Queue is full. Please wait for an available ticket."
+                : _dailyQueueLimitReached
+                ? "Today's queue number limit has been reached."
+                : !_kioskQueueEnabled
                 ? "Kiosk queue unavailable"
                 : _queueOpen ? "Queue is open" : "Queue is currently closed";
-            PrintTicketButton.Content = _pendingTicket is not null
+            PrintTicketButtonText.Text = _pendingTicket is not null
                 ? "RETRY PRINT"
+                : _queueAtCapacity ? "QUEUE FULL — PLEASE WAIT"
+                : _dailyQueueLimitReached ? "DAILY LIMIT REACHED"
                 : _kioskQueueEnabled ? "PRINT TICKET" : "KIOSK QUEUE UNAVAILABLE";
             PrintTicketButton.IsEnabled = _pendingTicket is not null
-                || (_kioskQueueEnabled && _queueOpen && !_isGeneratingTicket && IsServerOnline());
+                || (_canAcceptQueueEntry() && !_isGeneratingTicket && IsServerOnline());
+            if (!_canAcceptQueueEntry())
+            {
+                QrImage.Source = null;
+                _qrSessionToken = null;
+                QrLoadingText.Text = _queueAtCapacity
+                    ? "This department's queue is full. Please wait."
+                    : _dailyQueueLimitReached
+                    ? "Today's queue number limit has been reached."
+                    : "Queue entry is currently unavailable.";
+                QrLoadingText.Visibility = Visibility.Visible;
+            }
+            else if (QrImage.Source is null)
+            {
+                QrLoadingText.Text = "Preparing secure QR...";
+            }
             ErrorText.Visibility = Visibility.Collapsed;
         }
         catch (Exception ex)
@@ -129,9 +156,9 @@ public partial class DepartmentQueueWindow : Window
         await CheckServerAsync();
         if (IsServerOnline())
         {
-            if (QrImage.Source is null)
-                await LoadQrAsync();
             await RefreshQueueStatusAsync();
+            if (_canAcceptQueueEntry() && QrImage.Source is null)
+                await LoadQrAsync();
 
             if (_pendingTicket is null && await IsQrSessionScannedAsync())
             {
@@ -140,6 +167,9 @@ public partial class DepartmentQueueWindow : Window
             }
         }
     }
+
+    private bool _canAcceptQueueEntry() =>
+        _queueOpen && _kioskQueueEnabled && !_queueAtCapacity && !_dailyQueueLimitReached;
 
     private async Task<bool> IsQrSessionScannedAsync()
     {
@@ -165,12 +195,13 @@ public partial class DepartmentQueueWindow : Window
 
     private async void PrintTicketButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_isGeneratingTicket || (_pendingTicket is null && (!IsServerOnline() || !_kioskQueueEnabled)))
+        if (_isGeneratingTicket || (_pendingTicket is null
+            && (!IsServerOnline() || !_canAcceptQueueEntry())))
             return;
 
         _isGeneratingTicket = true;
         PrintTicketButton.IsEnabled = false;
-        PrintTicketButton.Content = _pendingTicket is null ? "GENERATING..." : "PRINTING...";
+        PrintTicketButtonText.Text = _pendingTicket is null ? "GENERATING..." : "PRINTING...";
         try
         {
             if (_pendingTicket is null)
@@ -178,7 +209,7 @@ public partial class DepartmentQueueWindow : Window
             GeneratedTicketNumberText.Text = _pendingTicket.QueueNumber;
             GeneratedTicketPanel.Visibility = Visibility.Visible;
 
-            PrintTicketButton.Content = "PRINTING...";
+            PrintTicketButtonText.Text = "PRINTING...";
             await Dispatcher.Yield(DispatcherPriority.Render);
             if (!_thermalPrinterService.Print(_pendingTicket))
             {
@@ -217,11 +248,13 @@ public partial class DepartmentQueueWindow : Window
             _isGeneratingTicket = false;
             if (IsVisible)
             {
-                PrintTicketButton.Content = _pendingTicket is not null
+                PrintTicketButtonText.Text = _pendingTicket is not null
                     ? "RETRY PRINT"
+                    : _queueAtCapacity ? "QUEUE FULL — PLEASE WAIT"
+                    : _dailyQueueLimitReached ? "DAILY LIMIT REACHED"
                     : _kioskQueueEnabled ? "PRINT TICKET" : "KIOSK QUEUE UNAVAILABLE";
                 PrintTicketButton.IsEnabled = _pendingTicket is not null
-                    || (_kioskQueueEnabled && IsServerOnline() && _queueOpen);
+                    || (_canAcceptQueueEntry() && IsServerOnline());
             }
         }
     }

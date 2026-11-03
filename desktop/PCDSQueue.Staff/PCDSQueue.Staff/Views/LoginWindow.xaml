@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="PCDS Queue Management System"
+        Icon="pack://application:,,,/Assets/pcds-queue.ico"
         Width="1150" Height="720" MinWidth="1000" MinHeight="650"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BackgroundBrush}">
@@ -17,21 +18,23 @@
                     <RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <StackPanel Margin="48,45,48,0">
-                    <Border Width="65" Height="65" HorizontalAlignment="Left" CornerRadius="15" Background="White">
-                        <TextBlock Text="P" Foreground="{StaticResource PrimaryBrush}" FontSize="30" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Border Width="76" Height="76" HorizontalAlignment="Left" CornerRadius="38" Background="White" Padding="4">
+                        <Image Source="/Assets/pcds-crest.png" Stretch="Uniform"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               AutomationProperties.Name="Polytechnic College of Davao del Sur crest" />
                     </Border>
-                    <TextBlock Text="PCDS" Foreground="#AFC5E9" FontSize="13" FontWeight="SemiBold" Margin="0,16,0,0" />
+                    <TextBlock Text="PCDS" Foreground="#C7E9EB" FontSize="13" FontWeight="SemiBold" Margin="0,16,0,0" />
                 </StackPanel>
                 <StackPanel Grid.Row="1" Margin="48" VerticalAlignment="Center">
                     <TextBlock Text="Queue Management" Foreground="White" FontSize="42" FontWeight="Bold" />
                     <TextBlock Text="System" Foreground="White" FontSize="42" FontWeight="Bold" />
-                    <TextBlock Text="A smarter and more organized way to manage campus service queues." Foreground="#B9CAE6" FontSize="16" LineHeight="25" MaxWidth="420" TextWrapping="Wrap" Margin="0,22,0,0" />
+                    <TextBlock Text="A smarter and more organized way to manage campus service queues." Foreground="#CCEDEE" FontSize="16" LineHeight="25" MaxWidth="420" TextWrapping="Wrap" Margin="0,22,0,0" />
                     <StackPanel Orientation="Horizontal" Margin="0,35,0,0">
                         <Ellipse Width="9" Height="9" Fill="#49D48A" VerticalAlignment="Center" />
-                        <TextBlock Text="Queue services available" Foreground="#D7E3F5" FontSize="13" Margin="10,0,0,0" />
+                        <TextBlock Text="Queue services available" Foreground="#DFF1F2" FontSize="13" Margin="10,0,0,0" />
                     </StackPanel>
                 </StackPanel>
-                <TextBlock Grid.Row="2" Text="Polytechnic College of Davao del Sur" Foreground="#91A9CE" FontSize="12" Margin="48,0,48,38" />
+                <TextBlock Grid.Row="2" Text="Polytechnic College of Davao del Sur" Foreground="#AEDDE0" FontSize="12" Margin="48,0,48,38" />
             </Grid>
         </Border>
 
@@ -49,7 +52,14 @@
                         <TextBlock x:Name="ErrorText" Foreground="#BE123C" FontSize="13" TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
-                <Button x:Name="SignInButton" Content="SIGN IN" Style="{StaticResource PrimaryButton}" Margin="0,26,0,0" IsEnabled="False" Click="SignInButton_Click" />
+                <Button x:Name="SignInButton" Style="{StaticResource PrimaryButton}" Margin="0,26,0,0" IsEnabled="False" Click="SignInButton_Click">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Path Data="M10,3 H4 V17 H10 M8,10 H17 M14,7 L17,10 L14,13"
+                              Width="18" Height="18" Stretch="Uniform" Fill="Transparent"
+                              Stroke="White" StrokeThickness="1.6" Margin="0,0,9,0" />
+                        <TextBlock Text="SIGN IN" Foreground="White" />
+                    </StackPanel>
+                </Button>
                 <StackPanel x:Name="LoadingPanel" Visibility="Collapsed" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
                     <ProgressBar Width="55" Height="4" IsIndeterminate="True" />
                     <TextBlock Text="Signing in..." Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" />

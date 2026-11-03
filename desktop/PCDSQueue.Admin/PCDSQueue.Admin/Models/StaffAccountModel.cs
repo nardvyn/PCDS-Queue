@@ -38,7 +38,7 @@ public sealed class StaffAccountSaveRequest
     public string Username { get; init; } = string.Empty;
 
     [JsonPropertyName("department_id")]
-    public int DepartmentId { get; init; }
+    public int? DepartmentId { get; init; }
 
     [JsonPropertyName("account_status")]
     public string AccountStatus { get; init; } = "ACTIVE";

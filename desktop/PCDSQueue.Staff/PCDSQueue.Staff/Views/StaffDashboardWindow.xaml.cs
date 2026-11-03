@@ -16,14 +16,10 @@ public partial class StaffDashboardWindow : Window
     {
         Interval = TimeSpan.FromSeconds(3)
     };
-    private readonly DispatcherTimer _graceCountdownTimer = new()
-    {
-        Interval = TimeSpan.FromSeconds(1)
-    };
 
     private ShiftModel? _shift;
     private QueueItemModel? _currentQueue;
-    private int _graceRemainingSeconds;
+    private int _graceRemainingSeconds = 0;
     private bool _isRefreshing;
     private bool _serverOnline;
     private bool _checkingServer;
@@ -37,15 +33,6 @@ public partial class StaffDashboardWindow : Window
         _serverTimer.Interval = TimeSpan.FromSeconds(3);
         _serverTimer.Tick += ServerTimer_Tick;
         _refreshTimer.Tick += async (_, _) => await RefreshQueueAsync();
-        _graceCountdownTimer.Tick += (_, _) =>
-        {
-            if (_currentQueue is null || _graceRemainingSeconds <= 0)
-                return;
-
-            _graceRemainingSeconds--;
-            UpdateGraceDisplay(_currentQueue.CanNoShow);
-        };
-        _graceCountdownTimer.Start();
     }
 
     private async void StaffDashboardWindow_Loaded(object sender, RoutedEventArgs e)
@@ -172,7 +159,6 @@ public partial class StaffDashboardWindow : Window
         {
             var status = await _queueService.GetDashboardAsync();
             _currentQueue = status.Current;
-            _graceRemainingSeconds = Math.Max(0, _currentQueue?.GraceRemainingSeconds ?? 0);
 
             WaitingText.Text = status.WaitingCount.ToString();
             NextQueueText.Text = status.Next?.QueueNumber ?? "---";
@@ -205,13 +191,9 @@ public partial class StaffDashboardWindow : Window
     private void UpdateGraceDisplay(bool canNoShow)
     {
         NoShowButton.IsEnabled = _serverOnline && _currentQueue is not null && canNoShow;
-        NoShowButton.Content = _currentQueue is null || canNoShow
-            ? "NO SHOW"
-            : $"NO SHOW - {_graceRemainingSeconds}s";
+        NoShowButtonText.Text = "NO SHOW";
 
-        GraceStatusText.Visibility = _currentQueue is null
-            ? Visibility.Collapsed
-            : Visibility.Visible;
+        GraceStatusText.Visibility = Visibility.Collapsed;
         GraceStatusText.Text = _currentQueue is null
             ? string.Empty
             : canNoShow
@@ -365,7 +347,6 @@ public partial class StaffDashboardWindow : Window
     {
         _serverTimer.Stop();
         _refreshTimer.Stop();
-        _graceCountdownTimer.Stop();
         base.OnClosed(e);
     }
 }

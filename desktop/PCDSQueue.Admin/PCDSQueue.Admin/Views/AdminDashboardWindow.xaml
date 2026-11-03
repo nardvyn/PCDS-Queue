@@ -6,6 +6,17 @@
         Width="1280" Height="800" MinWidth="1100" MinHeight="680"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BackgroundBrush}">
+    <Window.Resources>
+        <Geometry x:Key="DashboardIcon">M3,3 H9 V9 H3 Z M11,3 H17 V9 H11 Z M3,11 H9 V17 H3 Z M11,11 H17 V17 H11 Z</Geometry>
+        <Geometry x:Key="DepartmentsIcon">M3,17 H17 M5,17 V5 H15 V17 M7,8 H9 M11,8 H13 M7,11 H9 M11,11 H13 M8,17 V14 H12 V17</Geometry>
+        <Geometry x:Key="ServiceWindowsIcon">M3,8 L4.5,3 H15.5 L17,8 M4,8 V17 H16 V8 M4,8 H16 M8,8 V11 H12 V8 M7,13 H13 V17</Geometry>
+        <Geometry x:Key="StaffAccountsIcon">M7,8 A2.5,2.5 0 1 0 7,3 A2.5,2.5 0 1 0 7,8 M2,17 V15 A5,5 0 0 1 12,15 V17 M13,4 A2.5,2.5 0 0 1 13,9 M14,12 A4,4 0 0 1 18,16 V17</Geometry>
+        <Geometry x:Key="LiveQueueIcon">M2,10 H5 L7,5 L10,15 L12,8 L14,11 H18</Geometry>
+        <Geometry x:Key="QueueHistoryIcon">M10,2 A8,8 0 1 0 10.01,2 M10,5 V10 L13,12</Geometry>
+        <Geometry x:Key="ReportsIcon">M3,17 V3 M3,17 H18 M6,14 V10 H9 V14 M11,14 V6 H14 V14 M16,14 V3 H18 V14</Geometry>
+        <Geometry x:Key="QrManagementIcon">M3,3 H8 V8 H3 Z M12,3 H17 V8 H12 Z M3,12 H8 V17 H3 Z M12,12 H14 V14 H12 Z M16,12 H17 V14 H16 Z M12,16 H14 V17 H12 Z M16,16 H17 V17 H16 Z</Geometry>
+        <Geometry x:Key="SettingsIcon">M3,5 H7 M11,5 H17 M3,10 H12 M16,10 H17 M3,15 H5 M9,15 H17 M7,3 A2,2 0 1 0 7,7 A2,2 0 1 0 7,3 M14,8 A2,2 0 1 0 14,12 A2,2 0 1 0 14,8 M7,13 A2,2 0 1 0 7,17 A2,2 0 1 0 7,13</Geometry>
+    </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="245" />
@@ -20,55 +31,109 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <StackPanel>
-                    <Border Width="48" Height="48" HorizontalAlignment="Left"
-                            CornerRadius="10" Background="White">
-                        <TextBlock Text="P" Foreground="{StaticResource PrimaryBrush}"
-                                   FontSize="23" FontWeight="Bold"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Border Width="58" Height="58" HorizontalAlignment="Left"
+                            CornerRadius="29" Background="White" Padding="4">
+                        <Image Source="/Assets/pcds-crest.png" Stretch="Uniform"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               AutomationProperties.Name="Polytechnic College of Davao del Sur crest" />
                     </Border>
                     <TextBlock Text="PCDS QUEUE ADMIN" Foreground="White"
                                FontWeight="Bold" FontSize="15" Margin="0,15,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" Margin="0,42,0,0">
-                        <Button x:Name="DashboardNavigationButton" Content="Dashboard"
-                            Style="{StaticResource AdminNavigationButton}"
-                            Foreground="White" Background="#1D478B"
-                            Click="DashboardNavigationButton_Click" />
-                        <Button x:Name="DepartmentsNavigationButton" Content="Departments"
-                            Style="{StaticResource AdminNavigationButton}"
-                            Margin="0,8,0,0" Click="DepartmentsButton_Click" />
-                        <Button x:Name="ServiceWindowsNavigationButton" Content="Service Windows"
-                                Style="{StaticResource AdminNavigationButton}"
-                                Margin="0,4,0,0" Click="ServiceWindowsButton_Click" />
-                        <Button x:Name="StaffAccountsNavigationButton" Content="Staff Accounts"
-                            Style="{StaticResource AdminNavigationButton}"
-                            Margin="0,4,0,0" Click="StaffAccountsButton_Click" />
-                        <Button x:Name="LiveQueueNavigationButton" Content="Live Queue"
-                            Style="{StaticResource AdminNavigationButton}"
-                                Margin="0,4,0,0" Click="LiveQueueButton_Click" />
-                        <Button x:Name="QueueHistoryNavigationButton" Content="Queue History"
-                            Style="{StaticResource AdminNavigationButton}"
-                            Margin="0,4,0,0" Click="QueueHistoryButton_Click" />
-                        <Button x:Name="ReportsNavigationButton" Content="Reports"
-                            Style="{StaticResource AdminNavigationButton}"
-                            Margin="0,4,0,0" Click="ReportsButton_Click" />
-                        <Button x:Name="QrManagementNavigationButton" Content="QR Management"
-                            Style="{StaticResource AdminNavigationButton}"
-                            Margin="0,4,0,0" Click="QrManagementButton_Click" />
-                        <Button x:Name="SettingsNavigationButton" Content="Settings"
-                            Style="{StaticResource AdminNavigationButton}"
-                            Margin="0,4,0,0" Click="SettingsButton_Click" />
+                    <Button x:Name="DashboardNavigationButton" Style="{StaticResource AdminNavigationButton}"
+                            Foreground="White" Background="#066A76" Click="DashboardNavigationButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource DashboardIcon}" Width="18" Height="18" Stretch="Uniform"
+                                  Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5" StrokeLineJoin="Round" Margin="0,0,12,0" />
+                            <TextBlock Text="Dashboard" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="DepartmentsNavigationButton" Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,8,0,0" Click="DepartmentsButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource DepartmentsIcon}" Width="18" Height="18" Stretch="Uniform"
+                                  Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5" StrokeLineJoin="Round" Margin="0,0,12,0" />
+                            <TextBlock Text="Departments" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="ServiceWindowsNavigationButton" Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="ServiceWindowsButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource ServiceWindowsIcon}" Width="18" Height="18" Stretch="Uniform"
+                                  Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5" StrokeLineJoin="Round" Margin="0,0,12,0" />
+                            <TextBlock Text="Service Windows" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="StaffAccountsNavigationButton" Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="StaffAccountsButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource StaffAccountsIcon}" Width="18" Height="18" Stretch="Uniform"
+                                  Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5" StrokeLineJoin="Round" Margin="0,0,12,0" />
+                            <TextBlock Text="Staff Accounts" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="LiveQueueNavigationButton" Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="LiveQueueButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource LiveQueueIcon}" Width="18" Height="18" Stretch="Uniform"
+                                  Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5" StrokeLineJoin="Round" StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" Margin="0,0,12,0" />
+                            <TextBlock Text="Live Queue" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="QueueHistoryNavigationButton" Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="QueueHistoryButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource QueueHistoryIcon}" Width="18" Height="18" Stretch="Uniform"
+                                  Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5" StrokeLineJoin="Round" Margin="0,0,12,0" />
+                            <TextBlock Text="Queue History" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="ReportsNavigationButton" Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="ReportsButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource ReportsIcon}" Width="18" Height="18" Stretch="Uniform"
+                                  Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5" StrokeLineJoin="Round" Margin="0,0,12,0" />
+                            <TextBlock Text="Reports" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="QrManagementNavigationButton" Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="QrManagementButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource QrManagementIcon}" Width="18" Height="18" Stretch="Uniform"
+                                  Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5" StrokeLineJoin="Round" Margin="0,0,12,0" />
+                            <TextBlock Text="QR Management" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="SettingsNavigationButton" Style="{StaticResource AdminNavigationButton}"
+                            Margin="0,4,0,0" Click="SettingsButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource SettingsIcon}" Width="18" Height="18" Stretch="Uniform"
+                                  Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5" StrokeLineJoin="Round" Margin="0,0,12,0" />
+                            <TextBlock Text="Settings" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
 
                 <StackPanel Grid.Row="2">
-                    <Border Height="1" Background="#31518A" Margin="0,0,0,18" />
+                    <Border Height="1" Background="#318F99" Margin="0,0,0,18" />
                     <TextBlock x:Name="AdminNameText" Text="Administrator" Foreground="White"
                                FontSize="12" FontWeight="SemiBold" />
-                    <TextBlock x:Name="AdminUsernameText" Text="@admin" Foreground="#9FB5DA"
+                    <TextBlock x:Name="AdminUsernameText" Text="@admin" Foreground="#B4E1E3"
                                FontSize="11" Margin="0,4,0,14" />
                     <Button Content="LOG OUT" Height="40" Foreground="White"
-                            Background="#1A427E" BorderThickness="0" Cursor="Hand"
+                            Background="#065F6B" BorderThickness="0" Cursor="Hand"
                             Click="LogoutButton_Click" />
                 </StackPanel>
             </Grid>

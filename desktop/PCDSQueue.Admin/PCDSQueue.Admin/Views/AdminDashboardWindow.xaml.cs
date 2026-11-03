@@ -138,7 +138,7 @@ public partial class AdminDashboardWindow : Window
         PageSubtitleText.Text = "Configure campus departments and service windows";
         DashboardNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         DashboardNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
-        DepartmentsNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#1D478B")!;
+        DepartmentsNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#066A76")!;
         DepartmentsNavigationButton.Foreground = System.Windows.Media.Brushes.White;
         ServiceWindowsNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         ServiceWindowsNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
@@ -176,7 +176,7 @@ public partial class AdminDashboardWindow : Window
         DashboardNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
         DepartmentsNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         DepartmentsNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
-        ServiceWindowsNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#1D478B")!;
+        ServiceWindowsNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#066A76")!;
         ServiceWindowsNavigationButton.Foreground = System.Windows.Media.Brushes.White;
         StaffAccountsNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         StaffAccountsNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
@@ -222,7 +222,7 @@ public partial class AdminDashboardWindow : Window
         ReportsNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
         QrManagementNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         QrManagementNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
-        StaffAccountsNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#1D478B")!;
+        StaffAccountsNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#066A76")!;
         StaffAccountsNavigationButton.Foreground = System.Windows.Media.Brushes.White;
         await StaffAccountsPage.RefreshAsync();
     }
@@ -251,7 +251,7 @@ public partial class AdminDashboardWindow : Window
         ServiceWindowsNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
         StaffAccountsNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         StaffAccountsNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
-        LiveQueueNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#1D478B")!;
+        LiveQueueNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#066A76")!;
         LiveQueueNavigationButton.Foreground = System.Windows.Media.Brushes.White;
         QueueHistoryNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         QueueHistoryNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
@@ -293,7 +293,7 @@ public partial class AdminDashboardWindow : Window
         ReportsNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
         QrManagementNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         QrManagementNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
-        QueueHistoryNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#1D478B")!;
+        QueueHistoryNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#066A76")!;
         QueueHistoryNavigationButton.Foreground = System.Windows.Media.Brushes.White;
         await QueueHistoryPage.RefreshAsync();
     }
@@ -327,7 +327,7 @@ public partial class AdminDashboardWindow : Window
         LiveQueueNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
         QueueHistoryNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         QueueHistoryNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
-        ReportsNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#1D478B")!;
+        ReportsNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#066A76")!;
         ReportsNavigationButton.Foreground = System.Windows.Media.Brushes.White;
         QrManagementNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         QrManagementNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
@@ -365,7 +365,7 @@ public partial class AdminDashboardWindow : Window
         QueueHistoryNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
         ReportsNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         ReportsNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
-        QrManagementNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#1D478B")!;
+        QrManagementNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#066A76")!;
         QrManagementNavigationButton.Foreground = System.Windows.Media.Brushes.White;
         await QrManagementPage.RefreshAsync();
     }
@@ -401,7 +401,7 @@ public partial class AdminDashboardWindow : Window
         ReportsNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
         QrManagementNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         QrManagementNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;
-        SettingsNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#1D478B")!;
+        SettingsNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#066A76")!;
         SettingsNavigationButton.Foreground = System.Windows.Media.Brushes.White;
         await SettingsPage.RefreshAsync();
     }
@@ -422,7 +422,7 @@ public partial class AdminDashboardWindow : Window
         DashboardPage.Visibility = Visibility.Visible;
         PageTitleText.Text = "ADMIN DASHBOARD";
         PageSubtitleText.Text = "Campus queue overview for today";
-        DashboardNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#1D478B")!;
+        DashboardNavigationButton.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#066A76")!;
         DashboardNavigationButton.Foreground = System.Windows.Media.Brushes.White;
         DepartmentsNavigationButton.Background = System.Windows.Media.Brushes.Transparent;
         DepartmentsNavigationButton.Foreground = System.Windows.Media.Brushes.LightGray;

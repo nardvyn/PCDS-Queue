@@ -18,7 +18,7 @@ public sealed class ApiService
     {
         var baseAddress = Environment.GetEnvironmentVariable("PCDS_QUEUE_API_URL")?.Trim();
         if (string.IsNullOrWhiteSpace(baseAddress))
-            baseAddress = "http://127.0.0.1:5000/";
+            baseAddress = "https://pcds-queue-production.up.railway.app/";
         else if (!baseAddress.EndsWith('/'))
             baseAddress += "/";
 

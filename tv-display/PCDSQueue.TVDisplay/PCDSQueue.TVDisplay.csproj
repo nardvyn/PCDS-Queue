@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
+    <ApplicationIcon>Assets\pcds-queue.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +20,12 @@
     <Content Include="Assets\notification.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Resource Include="Assets\pcds-crest.png" />
+    <Resource Include="Assets\pcds-queue.ico" />
   </ItemGroup>
 
 </Project>

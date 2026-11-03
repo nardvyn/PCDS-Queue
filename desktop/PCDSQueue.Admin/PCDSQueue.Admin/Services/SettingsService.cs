@@ -48,6 +48,17 @@ public sealed class SettingsService
         };
     }
 
+    public async Task<string> ResetTodayQueueNumbersAsync()
+    {
+        using var response = await ApiService.Client.PostAsync("api/admin/queue/reset-today", null);
+        var json = await response.Content.ReadAsStringAsync();
+        EnsureSuccess(response, json);
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.TryGetProperty("message", out var message)
+            ? message.GetString() ?? "Today's queue numbers have been reset."
+            : "Today's queue numbers have been reset.";
+    }
+
     private static void EnsureSuccess(HttpResponseMessage response, string json)
     {
         if (response.IsSuccessStatusCode)

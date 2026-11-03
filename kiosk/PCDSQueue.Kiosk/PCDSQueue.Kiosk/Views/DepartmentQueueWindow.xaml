@@ -20,12 +20,19 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Button x:Name="BackButton" Content="BACK" Width="100" Height="42" VerticalAlignment="Center"
-                        Background="White" Foreground="#1F4E91" BorderBrush="#1F4E91"
-                        BorderThickness="1" FontWeight="SemiBold" Click="BackButton_Click" />
+                <Button x:Name="BackButton" Width="100" Height="42" VerticalAlignment="Center"
+                        Background="White" Foreground="#077F8D" BorderBrush="#077F8D"
+                        BorderThickness="1" FontWeight="SemiBold" Click="BackButton_Click">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Path Data="M17,10 H5 M9,6 L5,10 L9,14" Width="16" Height="16"
+                              Stretch="Uniform" Fill="Transparent" Stroke="#077F8D"
+                              StrokeThickness="1.5" Margin="0,0,7,0" />
+                        <TextBlock Text="BACK" Foreground="#077F8D" />
+                    </StackPanel>
+                </Button>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
                             VerticalAlignment="Center">
-                    <Border Width="42" Height="42" CornerRadius="9" Background="#173F7A">
+                    <Border Width="42" Height="42" CornerRadius="9" Background="#077F8D">
                         <TextBlock Text="P" Foreground="White" FontSize="20" FontWeight="Bold"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
@@ -70,10 +77,17 @@
                         </Border>
                         <TextBlock Text="OR" HorizontalAlignment="Center" Foreground="#718096"
                                    FontSize="12" FontWeight="SemiBold" Margin="0,12,0,10" />
-                        <Button x:Name="PrintTicketButton" Content="PRINT TICKET" Width="300" Height="54"
-                                HorizontalAlignment="Center" Background="#1F4E91" Foreground="White"
+                        <Button x:Name="PrintTicketButton" Width="300" Height="54"
+                                HorizontalAlignment="Center" Background="#077F8D" Foreground="White"
                                 BorderThickness="0" FontSize="16" FontWeight="Bold"
-                            Cursor="Hand" IsEnabled="False" Click="PrintTicketButton_Click" />
+                                Cursor="Hand" IsEnabled="False" Click="PrintTicketButton_Click">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Path Data="M5,3 H13 L16,6 V17 H5 Z M8,3 V8 H13 V4 M8,17 V11 H13 V17 M15,10 H18 V15 H15"
+                                      Width="18" Height="18" Stretch="Uniform" Fill="Transparent"
+                                      Stroke="White" StrokeThickness="1.5" Margin="0,0,9,0" />
+                                <TextBlock x:Name="PrintTicketButtonText" Text="PRINT TICKET" Foreground="White" />
+                            </StackPanel>
+                        </Button>
 
                         <Border x:Name="GeneratedTicketPanel" Padding="12,8" Margin="0,14,0,0"
                                 Background="#F0F7FF" BorderBrush="#B8D5F2" BorderThickness="1"
@@ -82,7 +96,7 @@
                                 <TextBlock Text="YOUR QUEUE NUMBER" HorizontalAlignment="Center"
                                            Foreground="#52657A" FontSize="11" FontWeight="SemiBold" />
                                 <TextBlock x:Name="GeneratedTicketNumberText" Text="---"
-                                           HorizontalAlignment="Center" Foreground="#173F7A"
+                                           HorizontalAlignment="Center" Foreground="#077F8D"
                                            FontSize="34" FontWeight="Bold" />
                             </StackPanel>
                         </Border>
@@ -96,6 +110,9 @@
                             <TextBlock Text="people" Foreground="#718096" FontSize="12"
                                        Margin="5,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
+                        <TextBlock x:Name="QueueCapacityText" Text="ACTIVE TICKETS: -- / --"
+                                   HorizontalAlignment="Center" Foreground="#52657A"
+                                   FontSize="12" FontWeight="SemiBold" Margin="0,8,0,0" />
                         <TextBlock x:Name="QueueStateText" Text="Checking queue status..."
                                    HorizontalAlignment="Center" Foreground="#718096"
                                    FontSize="11" Margin="0,7,0,0" />

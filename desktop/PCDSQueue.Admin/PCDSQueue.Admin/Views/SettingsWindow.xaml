@@ -27,6 +27,55 @@
                              Style="{StaticResource ModernTextBox}" Height="40" MaxLength="1"
                              Text="3" />
                 </Grid>
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="110" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Daily Queue Number Limit" Foreground="{StaticResource TextBrush}"
+                                   FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock Text="Maximum tickets per department each day (1–999)."
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11" Margin="0,3,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <TextBox x:Name="QueueDailyLimitTextBox" Grid.Column="1"
+                             Style="{StaticResource ModernTextBox}" Height="40" MaxLength="3"
+                             Text="100" />
+                </Grid>
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="110" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Maximum Active Tickets" Foreground="{StaticResource TextBrush}"
+                                   FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock Text="Maximum active tickets per department (1–999)."
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11" Margin="0,3,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <TextBox x:Name="QueueActiveLimitTextBox" Grid.Column="1"
+                             Style="{StaticResource ModernTextBox}" Height="40" MaxLength="3"
+                             Text="50" />
+                </Grid>
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Customer Grace Period" Foreground="{StaticResource TextBrush}" FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock Text="Time allowed for a customer to reach the service window." Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,3,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBox x:Name="GracePeriodTextBox" Style="{StaticResource ModernTextBox}" Width="65" Height="40" Padding="12,0" VerticalContentAlignment="Center" MaxLength="3" Text="60" ToolTip="Enter 10 to 300 seconds" />
+                        <TextBlock Text="Seconds" Foreground="{StaticResource MutedTextBrush}" FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0" />
+                    </StackPanel>
+                </Grid>
+                <CheckBox x:Name="EnableCountdownCheckBox" Content="Enable Call Countdown" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,14,0,0" />
+                <TextBlock Text="Show countdown after a queue number is called." Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="24,3,0,0" />
+                <CheckBox x:Name="LockNoShowCheckBox" Content="Lock No Show During Grace Period" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
+                <TextBlock Text="Staff cannot mark a customer as No Show until the countdown expires." Foreground="{StaticResource MutedTextBrush}" FontSize="11" TextWrapping="Wrap" Margin="24,3,0,0" />
+                <CheckBox x:Name="CustomerAcknowledgementCheckBox" Content="Allow Customer Acknowledgement" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
+                <TextBlock Text="Show I'M ON MY WAY in the mobile app." Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="24,3,0,0" />
                 <Border Height="1" Background="#E2E8F0" Margin="0,18,0,16" />
 
                 <TextBlock Text="QR SETTINGS" Foreground="{StaticResource TextBrush}"
@@ -47,11 +96,18 @@
                 </Grid>
                 <Border Height="1" Background="#E2E8F0" Margin="0,18,0,16" />
 
-                <TextBlock Text="DISPLAY SETTINGS" Foreground="{StaticResource TextBrush}"
+                <TextBlock Text="NOTIFICATIONS &amp; ANNOUNCEMENTS" Foreground="{StaticResource TextBrush}"
                            FontSize="13" FontWeight="Bold" />
                 <CheckBox x:Name="TvVoiceCheckBox" Content="TV voice announcement enabled"
                           Foreground="{StaticResource TextBrush}" FontSize="12"
                           Margin="0,13,0,0" />
+                <CheckBox x:Name="MobileCallAlertCheckBox" Content="Mobile Call Alert" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
+                <TextBlock Text="Ring and vibrate when the customer's number is called." Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="24,3,0,0" />
+                <CheckBox x:Name="MobileRecallAlertCheckBox" Content="Mobile Recall Alert" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
+                <TextBlock Text="Repeat the call alert during Recall." Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="24,3,0,0" />
+                <CheckBox x:Name="MobileVoiceCheckBox" Content="Mobile Voice Announcement" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
+                <TextBlock Text="Announce the queue number and service window when called." Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="24,3,0,0" />
+                <CheckBox x:Name="KeepAlertCheckBox" Content="Keep Alert Until Acknowledged" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
                 <Grid Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -68,14 +124,28 @@
                 </Grid>
                 <Border Height="1" Background="#E2E8F0" Margin="0,18,0,16" />
 
-                <TextBlock Text="QUEUE RULES" Foreground="{StaticResource TextBrush}"
+                <TextBlock Text="SYSTEM" Foreground="{StaticResource TextBrush}"
                            FontSize="13" FontWeight="Bold" />
+                <CheckBox x:Name="RequireJoinConfirmationCheckBox" Content="Require Join Confirmation" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,13,0,0" />
+                <TextBlock Text="Customer must tap JOIN QUEUE after scanning a QR code." Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="24,3,0,0" />
+                <CheckBox x:Name="AllowCancellationCheckBox" Content="Allow Mobile Queue Cancellation" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
+                <CheckBox x:Name="ShowPeopleAheadCheckBox" Content="Show People Ahead" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
+                <CheckBox x:Name="ShowEstimatedWaitCheckBox" Content="Show Estimated Wait Time" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
+                <CheckBox x:Name="ConnectionWarningCheckBox" Content="Show Connection Warning" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
+                <CheckBox x:Name="AutoReconnectCheckBox" Content="Automatic Reconnection" Foreground="{StaticResource TextBrush}" FontSize="12" Margin="0,10,0,0" />
                 <CheckBox x:Name="MobileQueueCheckBox" Content="Allow Mobile Queue"
                           Foreground="{StaticResource TextBrush}" FontSize="12"
                           Margin="0,13,0,0" />
                 <CheckBox x:Name="KioskQueueCheckBox" Content="Allow Kiosk Queue"
                           Foreground="{StaticResource TextBrush}" FontSize="12"
                           Margin="0,10,0,0" />
+                <Border Height="1" Background="#E2E8F0" Margin="0,18,0,16" />
+                <TextBlock Text="QUEUE MAINTENANCE" Foreground="{StaticResource TextBrush}" FontSize="13" FontWeight="Bold" />
+                <TextBlock Text="Resetting removes today's completed, cancelled, and no-show records. It is unavailable while queues are active." Foreground="{StaticResource MutedTextBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0" />
+                <Button x:Name="ResetQueueNumbersButton" Content="RESET TODAY'S NUMBERS"
+                        Width="210" Height="42" HorizontalAlignment="Left" Margin="0,12,0,0"
+                        Background="#DC3545" Foreground="White" BorderBrush="#DC3545"
+                        Click="ResetQueueNumbersButton_Click" />
 
                 <TextBlock x:Name="SettingsErrorText" Foreground="#DC3545" FontSize="12"
                            TextWrapping="Wrap" Visibility="Collapsed" Margin="0,16,0,0" />

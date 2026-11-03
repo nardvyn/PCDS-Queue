@@ -12,6 +12,11 @@ public partial class StaffAccountFormWindow : Window
     private readonly StaffAccountModel? _staff;
     private readonly bool _resetPasswordOnly;
 
+    private sealed record DepartmentOption(string DepartmentName, int? DepartmentId)
+    {
+        public string DisplayName => DepartmentName;
+    }
+
     public StaffAccountFormWindow(
         List<DepartmentModel> departments,
         StaffAccountModel? staff = null,
@@ -21,7 +26,13 @@ public partial class StaffAccountFormWindow : Window
         _departments = departments.Where(department => department.IsActive).ToList();
         _staff = staff;
         _resetPasswordOnly = resetPasswordOnly;
-        DepartmentComboBox.ItemsSource = _departments;
+
+        var options = new List<DepartmentOption>
+        {
+            new("Unassigned", null)
+        };
+        options.AddRange(_departments.Select(department => new DepartmentOption(department.DepartmentName, department.DepartmentId)));
+        DepartmentComboBox.ItemsSource = options;
 
         if (_resetPasswordOnly)
         {
@@ -39,7 +50,8 @@ public partial class StaffAccountFormWindow : Window
 
         if (_staff is null)
         {
-            DepartmentComboBox.SelectedIndex = _departments.Count > 0 ? 0 : -1;
+            DepartmentComboBox.SelectedItem = options.FirstOrDefault(option => option.DepartmentId is not null)
+                ?? options[0];
             return;
         }
 
@@ -51,9 +63,8 @@ public partial class StaffAccountFormWindow : Window
         AccountStatusField.Visibility = Visibility.Collapsed;
         FullNameTextBox.Text = _staff.FullName;
         UsernameTextBox.Text = _staff.Username;
-        DepartmentComboBox.SelectedItem = _departments.FirstOrDefault(
-            department => department.DepartmentId == _staff.DepartmentId)
-            ?? _departments.FirstOrDefault();
+        DepartmentComboBox.SelectedItem = options.FirstOrDefault(option => option.DepartmentId == _staff.DepartmentId)
+            ?? options[0];
     }
 
     private async void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -66,7 +77,7 @@ public partial class StaffAccountFormWindow : Window
 
         var fullName = FullNameTextBox.Text.Trim();
         var username = UsernameTextBox.Text.Trim();
-        var department = DepartmentComboBox.SelectedItem as DepartmentModel;
+        var department = DepartmentComboBox.SelectedItem as DepartmentOption;
         var password = PasswordInput.Password;
         var status = (AccountStatusComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "ACTIVE";
 
@@ -82,7 +93,7 @@ public partial class StaffAccountFormWindow : Window
         }
         if (department is null)
         {
-            ShowError("Select an active department.");
+            ShowError("Select a department or leave the account unassigned.");
             return;
         }
         if (_staff is null && password.Length < 8)

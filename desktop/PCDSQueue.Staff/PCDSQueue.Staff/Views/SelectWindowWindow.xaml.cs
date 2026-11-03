@@ -71,7 +71,7 @@ public partial class SelectWindowWindow : Window
                 CornerRadius = new CornerRadius(16),
                 BorderThickness = new Thickness(isSelected ? 2 : 1),
                 BorderBrush = new SolidColorBrush(
-                    (Color)ColorConverter.ConvertFromString(isSelected ? "#173F8A" : "#E2E8F0")),
+                    (Color)ColorConverter.ConvertFromString(isSelected ? "#077F8D" : "#E2E8F0")),
                 Background = Brushes.White
             };
 
@@ -114,11 +114,36 @@ public partial class SelectWindowWindow : Window
 
             var selectButton = new Button
             {
-                Content = isSelected ? "SELECTED" : "SELECT",
+                Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Children =
+                    {
+                        new System.Windows.Shapes.Path
+                        {
+                            Data = Geometry.Parse(isSelected
+                                ? "M3,10 L8,15 L17,5"
+                                : "M3,10 H15 M11,6 L15,10 L11,14"),
+                            Width = 15,
+                            Height = 15,
+                            Stretch = Stretch.Uniform,
+                            Fill = Brushes.Transparent,
+                            Stroke = Brushes.White,
+                            StrokeThickness = 1.5,
+                            Margin = new Thickness(0, 0, 7, 0)
+                        },
+                        new TextBlock
+                        {
+                            Text = isSelected ? "SELECTED" : "SELECT",
+                            VerticalAlignment = VerticalAlignment.Center
+                        }
+                    }
+                },
                 Height = 36,
                 IsEnabled = window.Available,
                 Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
-                    isSelected ? "#102E68" : "#173F8A")),
+                    isSelected ? "#066A76" : "#077F8D")),
                 Foreground = Brushes.White,
                 BorderThickness = new Thickness(0),
                 Cursor = System.Windows.Input.Cursors.Hand

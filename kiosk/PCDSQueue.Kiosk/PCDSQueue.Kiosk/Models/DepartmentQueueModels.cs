@@ -24,6 +24,18 @@ public sealed class DepartmentQueueStatusResponse
 
     [JsonPropertyName("waiting_count")]
     public int WaitingCount { get; init; }
+
+    [JsonPropertyName("active_queue_count")]
+    public int ActiveQueueCount { get; init; }
+
+    [JsonPropertyName("active_queue_limit")]
+    public int ActiveQueueLimit { get; init; } = 50;
+
+    [JsonPropertyName("daily_queue_count")]
+    public int DailyQueueCount { get; init; }
+
+    [JsonPropertyName("daily_queue_limit")]
+    public int DailyQueueLimit { get; init; } = 100;
 }
 
 public sealed class KioskQrSessionStatusResponse

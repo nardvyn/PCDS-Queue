@@ -46,7 +46,13 @@
                 <TextBlock x:Name="SelectionText" Text="Select an available window." Foreground="#718096" FontSize="13" />
                 <TextBlock x:Name="ErrorText" Visibility="Collapsed" Foreground="#BE123C" FontSize="12" Margin="0,7,0,0" />
             </StackPanel>
-            <Button x:Name="StartShiftButton" Content="START SHIFT" Style="{StaticResource PrimaryButton}" Width="180" HorizontalAlignment="Right" IsEnabled="False" Click="StartShiftButton_Click" />
+            <Button x:Name="StartShiftButton" Style="{StaticResource PrimaryButton}" Width="180" HorizontalAlignment="Right" IsEnabled="False" Click="StartShiftButton_Click">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Path Data="M3,10 H15 M11,6 L15,10 L11,14 M17,4 V16" Width="17" Height="17"
+                          Stretch="Uniform" Fill="Transparent" Stroke="White" StrokeThickness="1.6" Margin="0,0,8,0" />
+                    <TextBlock Text="START SHIFT" Foreground="White" />
+                </StackPanel>
+            </Button>
         </Grid>
     </Grid>
 </Window>

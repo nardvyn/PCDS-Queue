@@ -4,6 +4,16 @@
         Title="PCDS Queue - Staff"
         Width="1280" Height="800" MinWidth="1100" MinHeight="700"
         WindowStartupLocation="CenterScreen" Background="#F5F7FB">
+    <Window.Resources>
+        <Geometry x:Key="DashboardIcon">M3,3 H9 V9 H3 Z M11,3 H17 V9 H11 Z M3,11 H9 V17 H3 Z M11,11 H17 V17 H11 Z</Geometry>
+        <Geometry x:Key="HistoryIcon">M10,2 A8,8 0 1 0 10.01,2 M10,5 V10 L13,12</Geometry>
+        <Geometry x:Key="LogoutIcon">M10,3 H4 V17 H10 M8,10 H17 M14,7 L17,10 L14,13</Geometry>
+        <Geometry x:Key="NextIcon">M3,10 H15 M11,6 L15,10 L11,14 M17,4 V16</Geometry>
+        <Geometry x:Key="RecallIcon">M3,8 A7,7 0 1 1 4,14 M3,4 V8 H7 M10,6 V10 L13,12</Geometry>
+        <Geometry x:Key="CompleteIcon">M3,10 L8,15 L17,5</Geometry>
+        <Geometry x:Key="NoShowIcon">M4,4 L16,16 M16,4 L4,16</Geometry>
+        <Geometry x:Key="EndShiftIcon">M4,3 H16 V17 H4 Z M7,7 H13 M7,10 H13 M7,13 H11</Geometry>
+    </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width="245" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
         <Border Grid.Column="0" Background="#066A76">
@@ -19,14 +29,29 @@
                     <TextBlock Text="Staff Console" Foreground="#B4E1E3" FontSize="12" Margin="0,4,0,0" />
                 </StackPanel>
                 <StackPanel Grid.Row="1" Margin="0,65,0,0">
-                    <Button x:Name="DashboardNavButton" Content="Dashboard" Height="45" HorizontalContentAlignment="Left" Padding="14,0" Foreground="White" Background="#066A76" BorderThickness="0" Cursor="Hand" Click="DashboardNavButton_Click" />
-                    <Button x:Name="QueueHistoryNavButton" Content="Queue History" Height="45" Margin="0,18,0,0" HorizontalContentAlignment="Left" Padding="14,0" Foreground="#C8EAEC" Background="Transparent" BorderThickness="0" Cursor="Hand" Click="QueueHistoryButton_Click" />
+                    <Button x:Name="DashboardNavButton" Height="45" HorizontalContentAlignment="Left" Padding="14,0" Foreground="White" Background="#066A76" BorderThickness="0" Cursor="Hand" Click="DashboardNavButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource DashboardIcon}" Width="18" Height="18" Stretch="Uniform" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" Margin="0,0,12,0" />
+                            <TextBlock Text="Dashboard" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="QueueHistoryNavButton" Height="45" Margin="0,18,0,0" HorizontalContentAlignment="Left" Padding="14,0" Foreground="#C8EAEC" Background="Transparent" BorderThickness="0" Cursor="Hand" Click="QueueHistoryButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource HistoryIcon}" Width="18" Height="18" Stretch="Uniform" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" Margin="0,0,12,0" />
+                            <TextBlock Text="Queue History" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
                 <StackPanel Grid.Row="2">
                     <Border Height="1" Background="#318F99" Margin="0,0,0,20" />
                     <TextBlock x:Name="SidebarNameText" Text="Staff User" Foreground="White" FontWeight="SemiBold" FontSize="13" />
                     <TextBlock x:Name="SidebarUsernameText" Text="@staff" Foreground="#B4E1E3" FontSize="11" Margin="0,3,0,16" />
-                    <Button Content="LOGOUT" Height="42" Foreground="White" Background="#065F6B" BorderThickness="0" Cursor="Hand" Click="LogoutButton_Click" />
+                    <Button Height="42" Foreground="White" Background="#065F6B" BorderThickness="0" Cursor="Hand" Click="LogoutButton_Click">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Path Data="{StaticResource LogoutIcon}" Width="16" Height="16" Stretch="Uniform" Fill="Transparent" Stroke="White" StrokeThickness="1.5" Margin="0,0,9,0" />
+                            <TextBlock Text="LOGOUT" Foreground="White" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>
@@ -62,15 +87,35 @@
                         <StackPanel Grid.Row="1" VerticalAlignment="Center">
                             <TextBlock x:Name="CurrentQueueText" Text="---" Foreground="#066A76" FontSize="105" FontWeight="Bold" HorizontalAlignment="Center" />
                             <TextBlock x:Name="CurrentWindowText" Text="NO ACTIVE CUSTOMER" Foreground="#8B96A8" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,5,0,0" />
-                            <TextBlock x:Name="GraceStatusText" Visibility="Collapsed" Foreground="#A35F00" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,18,0,0" />
+                            <TextBlock x:Name="GraceStatusText" Visibility="Collapsed" />
                         </StackPanel>
                         <StackPanel Grid.Row="2">
-                            <Button x:Name="NextButton" Content="NEXT CUSTOMER" Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="NextButton_Click" />
+                            <Button x:Name="NextButton" Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="NextButton_Click">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Path Data="{StaticResource NextIcon}" Width="18" Height="18" Stretch="Uniform" Fill="Transparent" Stroke="White" StrokeThickness="1.6" Margin="0,0,9,0" />
+                                    <TextBlock Text="NEXT CUSTOMER" Foreground="White" />
+                                </StackPanel>
+                            </Button>
                             <Grid Margin="0,12,0,0">
                                 <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="10" /><ColumnDefinition /><ColumnDefinition Width="10" /><ColumnDefinition /></Grid.ColumnDefinitions>
-                                <Button x:Name="RecallButton" Grid.Column="0" Content="RECALL" Height="45" IsEnabled="False" Click="RecallButton_Click" />
-                                <Button x:Name="CompleteButton" Grid.Column="2" Content="COMPLETE" Height="45" IsEnabled="False" Click="CompleteButton_Click" />
-                                <Button x:Name="NoShowButton" Grid.Column="4" Content="NO SHOW" Height="45" IsEnabled="False" ToolTip="Available after the customer grace period." Click="NoShowButton_Click" />
+                                <Button x:Name="RecallButton" Grid.Column="0" Height="45" IsEnabled="False" Click="RecallButton_Click">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <Path Data="{StaticResource RecallIcon}" Width="16" Height="16" Stretch="Uniform" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" Margin="0,0,7,0" />
+                                        <TextBlock Text="RECALL" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="CompleteButton" Grid.Column="2" Height="45" IsEnabled="False" Click="CompleteButton_Click">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <Path Data="{StaticResource CompleteIcon}" Width="16" Height="16" Stretch="Uniform" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.7" Margin="0,0,7,0" />
+                                        <TextBlock Text="COMPLETE" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="NoShowButton" Grid.Column="4" Height="45" IsEnabled="False" Click="NoShowButton_Click">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <Path Data="{StaticResource NoShowIcon}" Width="16" Height="16" Stretch="Uniform" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" Margin="0,0,7,0" />
+                                        <TextBlock x:Name="NoShowButtonText" Text="NO SHOW" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                    </StackPanel>
+                                </Button>
                             </Grid>
                         </StackPanel>
                     </Grid>
@@ -92,7 +137,12 @@
                             <TextBlock x:Name="ShiftDepartmentText" Foreground="#172033" FontWeight="SemiBold" FontSize="12" Margin="0,14,0,0" />
                             <TextBlock x:Name="ShiftWindowText" Foreground="#718096" FontSize="12" Margin="0,4,0,0" />
                             <TextBlock x:Name="ShiftStartedText" Foreground="#9AA4B2" FontSize="11" Margin="0,4,0,0" />
-                            <Button x:Name="EndShiftButton" Content="END SHIFT" Height="42" Margin="0,20,0,0" IsEnabled="False" Click="EndShiftButton_Click" />
+                            <Button x:Name="EndShiftButton" Height="42" Margin="0,20,0,0" IsEnabled="False" Click="EndShiftButton_Click">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Path Data="{StaticResource EndShiftIcon}" Width="16" Height="16" Stretch="Uniform" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" Margin="0,0,8,0" />
+                                    <TextBlock Text="END SHIFT" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Border>
                 </StackPanel>

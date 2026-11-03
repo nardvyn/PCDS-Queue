@@ -13,15 +13,21 @@
                      <TextBlock Text="✓ TICKET PRINTED" HorizontalAlignment="Center"
                                     Foreground="#16784C" FontWeight="Bold" FontSize="18" />
                 <TextBlock x:Name="QueueNumberText" Text="---" HorizontalAlignment="Center"
-                                    Margin="0,20,0,0" Foreground="#173F7A" FontWeight="Bold" FontSize="76" />
+                                    Margin="0,20,0,0" Foreground="#077F8D" FontWeight="Bold" FontSize="76" />
                      <TextBlock Text="Please get your ticket." HorizontalAlignment="Center"
                                     Margin="0,12,0,24" Foreground="#52657A" FontSize="16" />
                 <TextBlock x:Name="AutoReturnText" Text="Returning to home in 5 seconds..."
                        HorizontalAlignment="Center" Foreground="#9AA4B2"
                               FontSize="12" Margin="0,0,0,20" />
-                <Button Content="DONE" Height="48" Margin="0,11,0,0" Background="White"
-                        Foreground="#1F4E91" BorderBrush="#1F4E91" BorderThickness="1"
-                        FontWeight="SemiBold" Cursor="Hand" Click="DoneButton_Click" />
+                <Button Height="48" Margin="0,11,0,0" Background="White"
+                        Foreground="#077F8D" BorderBrush="#077F8D" BorderThickness="1"
+                        FontWeight="SemiBold" Cursor="Hand" Click="DoneButton_Click">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Path Data="M3,10 L8,15 L17,5" Width="17" Height="17" Stretch="Uniform"
+                              Fill="Transparent" Stroke="#077F8D" StrokeThickness="1.7" Margin="0,0,8,0" />
+                        <TextBlock Text="DONE" Foreground="#077F8D" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Border>
     </Grid>

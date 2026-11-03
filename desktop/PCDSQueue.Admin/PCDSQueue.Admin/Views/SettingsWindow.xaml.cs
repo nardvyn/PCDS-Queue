@@ -9,6 +9,7 @@ namespace PCDSQueue.Admin.Views;
 public partial class SettingsWindow : UserControl
 {
     private readonly SettingsService _settingsService = new();
+    private SystemSettingsModel? _loadedSettings;
 
     public SettingsWindow()
     {
@@ -54,9 +55,24 @@ public partial class SettingsWindow : UserControl
             ShowError("Queue number digits must be from 2 to 6.");
             return;
         }
+        if (!int.TryParse(QueueDailyLimitTextBox.Text, out var queueDailyLimit) || queueDailyLimit is < 1 or > 999)
+        {
+            ShowError("Daily queue number limit must be from 1 to 999.");
+            return;
+        }
+        if (!int.TryParse(QueueActiveLimitTextBox.Text, out var queueActiveLimit) || queueActiveLimit is < 1 or > 999)
+        {
+            ShowError("Maximum active tickets must be from 1 to 999.");
+            return;
+        }
         if (!int.TryParse(QrExpirationHoursTextBox.Text, out var qrHours) || qrHours is < 1 or > 168)
         {
             ShowError("QR expiration must be from 1 to 168 hours.");
+            return;
+        }
+        if (!int.TryParse(GracePeriodTextBox.Text, out var gracePeriod) || gracePeriod is < 10 or > 300)
+        {
+            ShowError("Customer grace period must be from 10 to 300 seconds.");
             return;
         }
         if (!int.TryParse(RefreshIntervalTextBox.Text, out var refreshInterval) || refreshInterval is < 1 or > 60)
@@ -72,8 +88,26 @@ public partial class SettingsWindow : UserControl
             var settings = new SystemSettingsModel
             {
                 QueueDigits = queueDigits,
+                QueueDailyLimit = queueDailyLimit,
+                QueueActiveLimit = queueActiveLimit,
+                CallGracePeriodSeconds = gracePeriod,
+                EnableCallCountdown = EnableCountdownCheckBox.IsChecked == true,
+                LockNoShowDuringGrace = LockNoShowCheckBox.IsChecked == true,
+                AllowCustomerAcknowledgement = CustomerAcknowledgementCheckBox.IsChecked == true,
                 QrExpirationHours = qrHours,
                 TvVoiceEnabled = TvVoiceCheckBox.IsChecked == true,
+                MobileCallAlert = MobileCallAlertCheckBox.IsChecked == true,
+                MobileRecallAlert = MobileRecallAlertCheckBox.IsChecked == true,
+                MobileVoiceAnnouncement = MobileVoiceCheckBox.IsChecked == true,
+                RequireJoinConfirmation = RequireJoinConfirmationCheckBox.IsChecked == true,
+                AllowMobileCancellation = AllowCancellationCheckBox.IsChecked == true,
+                ShowPeopleAhead = ShowPeopleAheadCheckBox.IsChecked == true,
+                ShowEstimatedWaitTime = ShowEstimatedWaitCheckBox.IsChecked == true,
+                KeepAlertUntilAcknowledged = KeepAlertCheckBox.IsChecked == true,
+                ShowConnectionWarning = ConnectionWarningCheckBox.IsChecked == true,
+                AutomaticReconnection = AutoReconnectCheckBox.IsChecked == true,
+                MobileAlertDurationSeconds = _loadedSettings?.MobileAlertDurationSeconds ?? 15,
+                OfflineRetryIntervalSeconds = _loadedSettings?.OfflineRetryIntervalSeconds ?? 5,
                 RefreshInterval = refreshInterval,
                 MobileQueueEnabled = MobileQueueCheckBox.IsChecked == true,
                 KioskQueueEnabled = KioskQueueCheckBox.IsChecked == true
@@ -85,6 +119,44 @@ public partial class SettingsWindow : UserControl
             EnvironmentText.Text = response.SystemInfo.Environment;
             UpdateSystemStatus(response.SystemInfo.ApiServer, response.SystemInfo.Database);
             SettingsErrorText.Visibility = Visibility.Collapsed;
+            SettingsSavedText.Text = $"Settings saved. Customer grace period: {response.Settings.CallGracePeriodSeconds} seconds.";
+            SettingsSavedText.Visibility = Visibility.Visible;
+            MessageBox.Show(
+                SettingsSavedText.Text,
+                "PCDS Queue Settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+            MessageBox.Show(
+                $"Unable to save settings.\n\n{ex.Message}",
+                "PCDS Queue Settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            SaveSettingsButton.IsEnabled = true;
+        }
+    }
+
+    private async void ResetQueueNumbersButton_Click(object sender, RoutedEventArgs e)
+    {
+        var confirmation = MessageBox.Show(
+            "This permanently removes today's completed, cancelled, and no-show queue records, then restarts numbering at 1. Active queues prevent the reset. Continue?",
+            "Reset Today's Queue Numbers",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirmation != MessageBoxResult.Yes)
+            return;
+
+        ResetQueueNumbersButton.IsEnabled = false;
+        try
+        {
+            SettingsSavedText.Text = await _settingsService.ResetTodayQueueNumbersAsync();
+            SettingsErrorText.Visibility = Visibility.Collapsed;
             SettingsSavedText.Visibility = Visibility.Visible;
         }
         catch (Exception ex)
@@ -93,15 +165,32 @@ public partial class SettingsWindow : UserControl
         }
         finally
         {
-            SaveSettingsButton.IsEnabled = true;
+            ResetQueueNumbersButton.IsEnabled = true;
         }
     }
 
     private void ApplySettings(SystemSettingsModel settings)
     {
+        _loadedSettings = settings;
         QueueDigitsTextBox.Text = settings.QueueDigits.ToString();
+        QueueDailyLimitTextBox.Text = settings.QueueDailyLimit.ToString();
+        QueueActiveLimitTextBox.Text = settings.QueueActiveLimit.ToString();
+        GracePeriodTextBox.Text = settings.CallGracePeriodSeconds.ToString();
+        EnableCountdownCheckBox.IsChecked = settings.EnableCallCountdown;
+        LockNoShowCheckBox.IsChecked = settings.LockNoShowDuringGrace;
+        CustomerAcknowledgementCheckBox.IsChecked = settings.AllowCustomerAcknowledgement;
         QrExpirationHoursTextBox.Text = settings.QrExpirationHours.ToString();
         TvVoiceCheckBox.IsChecked = settings.TvVoiceEnabled;
+        MobileCallAlertCheckBox.IsChecked = settings.MobileCallAlert;
+        MobileRecallAlertCheckBox.IsChecked = settings.MobileRecallAlert;
+        MobileVoiceCheckBox.IsChecked = settings.MobileVoiceAnnouncement;
+        RequireJoinConfirmationCheckBox.IsChecked = settings.RequireJoinConfirmation;
+        AllowCancellationCheckBox.IsChecked = settings.AllowMobileCancellation;
+        ShowPeopleAheadCheckBox.IsChecked = settings.ShowPeopleAhead;
+        ShowEstimatedWaitCheckBox.IsChecked = settings.ShowEstimatedWaitTime;
+        KeepAlertCheckBox.IsChecked = settings.KeepAlertUntilAcknowledged;
+        ConnectionWarningCheckBox.IsChecked = settings.ShowConnectionWarning;
+        AutoReconnectCheckBox.IsChecked = settings.AutomaticReconnection;
         RefreshIntervalTextBox.Text = settings.RefreshInterval.ToString();
         MobileQueueCheckBox.IsChecked = settings.MobileQueueEnabled;
         KioskQueueCheckBox.IsChecked = settings.KioskQueueEnabled;

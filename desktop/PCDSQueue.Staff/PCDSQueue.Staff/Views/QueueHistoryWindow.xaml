@@ -16,7 +16,14 @@
                 <TextBlock Text="QUEUE HISTORY" FontSize="28" FontWeight="Bold" Foreground="#172033" />
                 <TextBlock Text="Latest 100 queue transactions in your department" FontSize="13" Foreground="#718096" Margin="0,6,0,0" />
             </StackPanel>
-            <Button Content="BACK TO DASHBOARD" HorizontalAlignment="Right" Width="180" Height="42" Click="BackButton_Click" />
+            <Button HorizontalAlignment="Right" Width="190" Height="42" Click="BackButton_Click">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Path Data="M17,10 H5 M9,6 L5,10 L9,14" Width="16" Height="16"
+                          Stretch="Uniform" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.5" Margin="0,0,8,0" />
+                    <TextBlock Text="BACK TO DASHBOARD" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                </StackPanel>
+            </Button>
         </Grid>
         <Border Grid.Row="2" Background="White" CornerRadius="16" BorderBrush="#E2E8F0" BorderThickness="1" Padding="22">
             <DataGrid x:Name="HistoryDataGrid"

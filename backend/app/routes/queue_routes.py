@@ -16,7 +16,6 @@ queue_bp = Blueprint(
     url_prefix="/api/queue"
 )
 
-
 def _get_call_grace_period():
     value = db.session.execute(text("""
         SELECT setting_value FROM system_settings
@@ -243,6 +242,7 @@ def generate_queue():
                 FROM system_settings
                 WHERE setting_key IN (
                     'queue_digits', 'queue_number_digits',
+                    'queue_daily_limit', 'queue_active_limit',
                     'mobile_queue_enabled', 'kiosk_queue_enabled'
                 )
             """)
@@ -259,6 +259,16 @@ def generate_queue():
         except (TypeError, ValueError):
             queue_digits = 3
         queue_digits = min(6, max(2, queue_digits))
+        try:
+            queue_daily_limit = int(settings.get("queue_daily_limit", 100))
+        except (TypeError, ValueError):
+            queue_daily_limit = 100
+        queue_daily_limit = min(999, max(1, queue_daily_limit))
+        try:
+            queue_active_limit = int(settings.get("queue_active_limit", 50))
+        except (TypeError, ValueError):
+            queue_active_limit = 50
+        queue_active_limit = min(999, max(1, queue_active_limit))
 
         # Prevent one mobile device from holding two active tickets in the same department.
         if source == "MOBILE" and device_identifier:
@@ -324,8 +334,36 @@ def generate_queue():
             {"department_id": department_id, "queue_date": today}
         ).mappings().first()
 
+        active_queue_count = db.session.execute(
+            text("""
+                SELECT COUNT(*)
+                FROM queue_numbers
+                WHERE department_id = :department_id
+                  AND queue_date = :queue_date
+                  AND status IN ('WAITING', 'CALLED', 'SERVING')
+            """),
+            {"department_id": department_id, "queue_date": today}
+        ).scalar()
+        if active_queue_count >= queue_active_limit:
+            db.session.rollback()
+            return jsonify({
+                "message": (
+                    f"This department's queue is full. "
+                    f"The maximum is {queue_active_limit} active customers."
+                )
+            }), 409
+
+        if counter["last_number"] >= queue_daily_limit:
+            db.session.rollback()
+            return jsonify({
+                "message": (
+                    f"Today's queue limit of {queue_daily_limit} tickets "
+                    "for this department has been reached."
+                )
+            }), 409
+
         next_number = counter["last_number"] + 1
-        # 1 -> C001, 10 -> C010, 1000 -> C1000
+        # 1 -> C001, 10 -> C010
         queue_number = f"{department['queue_prefix']}{next_number:0{queue_digits}d}"
 
         db.session.execute(
@@ -431,6 +469,44 @@ def department_status(department_id):
         )
 
         waiting_count = _waiting_count(department_id)
+        active_queue_count = db.session.execute(
+            text("""
+                SELECT COUNT(*)
+                FROM queue_numbers
+                WHERE department_id = :department_id
+                  AND queue_date = CURDATE()
+                  AND status IN ('WAITING', 'CALLED', 'SERVING')
+            """),
+            {"department_id": department_id}
+        ).scalar()
+        limit_rows = db.session.execute(
+            text("""
+                SELECT setting_key, setting_value
+                FROM system_settings
+                WHERE setting_key IN ('queue_daily_limit', 'queue_active_limit')
+            """)
+        ).mappings().all()
+        queue_limits = {row["setting_key"]: row["setting_value"] for row in limit_rows}
+        try:
+            active_queue_limit = int(queue_limits.get("queue_active_limit", 50))
+        except (TypeError, ValueError):
+            active_queue_limit = 50
+        active_queue_limit = min(999, max(1, active_queue_limit))
+        try:
+            daily_queue_limit = int(queue_limits.get("queue_daily_limit", 100))
+        except (TypeError, ValueError):
+            daily_queue_limit = 100
+        daily_queue_limit = min(999, max(1, daily_queue_limit))
+        daily_queue_count = db.session.execute(
+            text("""
+                SELECT last_number
+                FROM queue_counters
+                WHERE department_id = :department_id
+                  AND queue_date = CURDATE()
+                LIMIT 1
+            """),
+            {"department_id": department_id}
+        ).scalar() or 0
 
         next_waiting = db.session.execute(
             text("""
@@ -481,6 +557,10 @@ def department_status(department_id):
                 "kiosk_queue_enabled": kiosk_queue_enabled
             },
             "waiting_count": waiting_count,
+            "active_queue_count": int(active_queue_count or 0),
+            "active_queue_limit": active_queue_limit,
+            "daily_queue_count": int(daily_queue_count),
+            "daily_queue_limit": daily_queue_limit,
             "active_window_count": int(active_window_count or 0),
             "next_waiting": (
                 {"queue_id": next_waiting["queue_id"], "queue_number": next_waiting["queue_number"]}

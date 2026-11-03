@@ -213,6 +213,60 @@ def create_kiosk_qr_session(department_id):
         if kiosk_enabled is not None and str(kiosk_enabled).strip().lower() not in {"true", "1", "yes", "on"}:
             return jsonify({"message": "Kiosk queue entry is currently disabled."}), 403
 
+        limit_rows = db.session.execute(
+            text("""
+                SELECT setting_key, setting_value
+                FROM system_settings
+                WHERE setting_key IN ('queue_daily_limit', 'queue_active_limit')
+            """)
+        ).mappings().all()
+        queue_limits = {row["setting_key"]: row["setting_value"] for row in limit_rows}
+        try:
+            active_queue_limit = int(queue_limits.get("queue_active_limit", 50))
+        except (TypeError, ValueError):
+            active_queue_limit = 50
+        active_queue_limit = min(999, max(1, active_queue_limit))
+        try:
+            daily_queue_limit = int(queue_limits.get("queue_daily_limit", 100))
+        except (TypeError, ValueError):
+            daily_queue_limit = 100
+        daily_queue_limit = min(999, max(1, daily_queue_limit))
+        active_queue_count = db.session.execute(
+            text("""
+                SELECT COUNT(*)
+                FROM queue_numbers
+                WHERE department_id = :department_id
+                  AND queue_date = CURDATE()
+                  AND status IN ('WAITING', 'CALLED', 'SERVING')
+            """),
+            {"department_id": department_id}
+        ).scalar()
+        if active_queue_count >= active_queue_limit:
+            return jsonify({
+                "message": (
+                    "This department's queue is full. "
+                    f"The maximum is {active_queue_limit} active customers."
+                )
+            }), 409
+
+        daily_queue_count = db.session.execute(
+            text("""
+                SELECT last_number
+                FROM queue_counters
+                WHERE department_id = :department_id
+                  AND queue_date = CURDATE()
+                LIMIT 1
+            """),
+            {"department_id": department_id}
+        ).scalar() or 0
+        if daily_queue_count >= daily_queue_limit:
+            return jsonify({
+                "message": (
+                    f"Today's queue limit of {daily_queue_limit} tickets "
+                    "for this department has been reached."
+                )
+            }), 409
+
         expiration_setting = db.session.execute(
             text("SELECT setting_value FROM system_settings WHERE setting_key = 'qr_expiration_hours'")
         ).scalar()

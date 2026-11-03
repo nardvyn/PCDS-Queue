@@ -13,6 +13,8 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/api/admin")
 
 SYSTEM_SETTING_DEFAULTS = {
     "queue_digits": 3,
+    "queue_daily_limit": 100,
+    "queue_active_limit": 50,
     "call_grace_period_seconds": 60,
     "enable_call_countdown": True,
     "lock_no_show_during_grace": True,
@@ -38,6 +40,8 @@ SYSTEM_SETTING_DEFAULTS = {
 
 SYSTEM_SETTING_DESCRIPTIONS = {
     "queue_digits": "Number of digits used to pad queue numbers",
+    "queue_daily_limit": "Maximum queue numbers issued per department each day",
+    "queue_active_limit": "Maximum active queue tickets per department",
     "call_grace_period_seconds": "Seconds a called customer has before the grace period expires",
     "enable_call_countdown": "Show the call grace-period countdown to customers",
     "lock_no_show_during_grace": "Prevent staff from marking a called customer as no-show during the grace period",
@@ -1625,6 +1629,8 @@ def _read_system_settings():
 
     return {
         "queue_digits": min(6, max(2, queue_digits)),
+        "queue_daily_limit": read_int("queue_daily_limit", 100, 1, 999),
+        "queue_active_limit": read_int("queue_active_limit", 50, 1, 999),
         "call_grace_period_seconds": min(300, max(10, call_grace_period_seconds)),
         "enable_call_countdown": read_bool("enable_call_countdown", True),
         "lock_no_show_during_grace": read_bool("lock_no_show_during_grace", True),
@@ -1697,6 +1703,10 @@ def update_admin_settings():
 
     if isinstance(values["queue_digits"], bool) or not isinstance(values["queue_digits"], int) or not 2 <= values["queue_digits"] <= 6:
         return jsonify({"message": "queue_digits must be an integer from 2 to 6."}), 400
+    if isinstance(values["queue_daily_limit"], bool) or not isinstance(values["queue_daily_limit"], int) or not 1 <= values["queue_daily_limit"] <= 999:
+        return jsonify({"message": "queue_daily_limit must be an integer from 1 to 999."}), 400
+    if isinstance(values["queue_active_limit"], bool) or not isinstance(values["queue_active_limit"], int) or not 1 <= values["queue_active_limit"] <= 999:
+        return jsonify({"message": "queue_active_limit must be an integer from 1 to 999."}), 400
     if isinstance(values["call_grace_period_seconds"], bool) or not isinstance(values["call_grace_period_seconds"], int) or not 10 <= values["call_grace_period_seconds"] <= 300:
         return jsonify({"message": "call_grace_period_seconds must be an integer from 10 to 300."}), 400
     if isinstance(values["mobile_alert_duration_seconds"], bool) or not isinstance(values["mobile_alert_duration_seconds"], int) or not 1 <= values["mobile_alert_duration_seconds"] <= 120:
@@ -1722,18 +1732,14 @@ def update_admin_settings():
         for key, value in values.items():
             db.session.execute(
                 text("""
-                    INSERT INTO system_settings (setting_key, setting_value, description, updated_by)
-                    VALUES (:setting_key, :setting_value, :description, :updated_by)
+                    INSERT INTO system_settings (setting_key, setting_value)
+                    VALUES (:setting_key, :setting_value)
                     ON DUPLICATE KEY UPDATE
-                        setting_value = VALUES(setting_value),
-                        description = VALUES(description),
-                        updated_by = VALUES(updated_by)
+                        setting_value = VALUES(setting_value)
                 """),
                 {
                     "setting_key": key,
-                    "setting_value": str(value).lower() if isinstance(value, bool) else str(value),
-                    "description": SYSTEM_SETTING_DESCRIPTIONS[key],
-                    "updated_by": admin_id
+                    "setting_value": str(value).lower() if isinstance(value, bool) else str(value)
                 }
             )
         db.session.commit()
